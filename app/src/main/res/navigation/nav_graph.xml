@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/messagesFragment">
+
+    <!-- ── Messages / Inbox ───────────────────────────── -->
+    <fragment
+        android:id="@+id/messagesFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.MessagesFragment"
+        android:label="Messages"
+        tools:layout="@layout/fragment_messages">
+
+        <action
+            android:id="@+id/action_messages_to_detail"
+            app:destination="@id/messageDetailFragment" />
+    </fragment>
+
+    <!-- ── Message Detail / Detection Result ─────────── -->
+    <fragment
+        android:id="@+id/messageDetailFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.MessageDetailFragment"
+        android:label="Message Detail"
+        tools:layout="@layout/fragment_message_detail">
+
+        <argument
+            android:name="messageId"
+            app:argType="long" />
+    </fragment>
+
+    <!-- ── Report Logs ────────────────────────────────── -->
+    <fragment
+        android:id="@+id/reportLogsFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.ReportLogsFragment"
+        android:label="Report Logs"
+        tools:layout="@layout/fragment_report_logs" />
+
+    <!-- ── Safety Tips ────────────────────────────────── -->
+    <fragment
+        android:id="@+id/safetyTipsFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.SafetyTipsFragment"
+        android:label="Safety Tips"
+        tools:layout="@layout/fragment_safety_tips" />
+
+    <!-- ── Onboarding / Permission Screen ────────────── -->
+    <fragment
+        android:id="@+id/onboardingFragment"
+        android:name="com.apcida.smishingdetector.view.activity.OnboardingActivity"
+        android:label="Setup"
+        tools:layout="@layout/activity_onboarding" />
+
+</navigation>

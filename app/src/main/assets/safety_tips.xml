@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<safety_tips>
+
+    <tip title="Never Click Unverified Links" category="GENERAL">
+        <content>Do not click links in SMS messages from unknown senders. Legitimate organizations like banks and government agencies will never ask you to click a link to verify your account via text message.</content>
+    </tip>
+
+    <tip title="Shortened URLs Are a Red Flag" category="URL_SAFETY">
+        <content>Be cautious of shortened links such as bit.ly or tinyurl.com in SMS messages. Scammers use these to hide the real destination of a link. When in doubt, do not click.</content>
+    </tip>
+
+    <tip title="GCash and Banks Will Never Ask for Your OTP" category="BANKING_SCAM">
+        <content>GCash, BDO, BPI, and other financial institutions will never ask for your One-Time Password (OTP), PIN, or password through SMS. If a message asks for these, it is a scam.</content>
+    </tip>
+
+    <tip title="Urgency Is a Manipulation Tactic" category="GENERAL">
+        <content>Scammers often use urgent language like "Act now," "Your account will be locked," or "Limited time only" to pressure you into clicking without thinking. Take a moment to verify before acting.</content>
+    </tip>
+
+    <tip title="Prize and Reward Messages Are Almost Always Scams" category="GENERAL">
+        <content>Messages claiming you have won a prize, reward, or cash that you did not enter a contest for are almost certainly scams. Legitimate companies do not notify winners through unsolicited SMS messages.</content>
+    </tip>
+
+    <tip title="Verify Delivery Messages Through Official Apps" category="DELIVERY_SCAM">
+        <content>If you receive an SMS about a parcel or delivery, do not click the link in the message. Instead, open the official website or app of the courier service and track your package directly there.</content>
+    </tip>
+
+    <tip title="SIM Registration Did Not Stop Scammers" category="GENERAL">
+        <content>Even with the SIM Registration Act in effect, scammers continue to send fraudulent messages using registered SIMs under false identities. Always evaluate the content of the message, not just the sender.</content>
+    </tip>
+
+    <tip title="Sender Names Can Be Faked" category="GENERAL">
+        <content>Scammers can make SMS messages appear to come from trusted names like GCash, BDO, or government agencies. This is called Sender ID spoofing. Always read the message content carefully before taking any action.</content>
+    </tip>
+
+    <tip title="Report Suspicious Messages" category="GENERAL">
+        <content>If you receive a suspicious SMS, report it using this app or forward it to the NTC (National Telecommunications Commission) or PNP Anti-Cybercrime Group. Reporting helps protect others in your community.</content>
+    </tip>
+
+    <tip title="Protect Your Personal Information" category="GENERAL">
+        <content>Never share your full name, address, birthday, bank account number, credit card details, or government ID numbers in response to an SMS message. No legitimate institution will request this through text.</content>
+    </tip>
+
+</safety_tips>
