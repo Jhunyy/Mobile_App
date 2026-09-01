@@ -50,6 +50,11 @@ class ReportUploadManager(private val context: Context) {
                 return@withContext
             }
 
+            if (!isReportServerConfigured()) {
+                Log.w(TAG, "Report server is not configured. Leaving reports pending.")
+                return@withContext
+            }
+
             val unsentReports = reportRepository.getUnsentReports()
 
             if (unsentReports.isEmpty()) {
@@ -87,7 +92,11 @@ class ReportUploadManager(private val context: Context) {
                 reportedAt = report.reportedAt
             )
 
-            val response = apiService.submitReport(payload)
+            val response = apiService.submitReport(
+                apiKey = Constants.REPORT_API_KEY,
+                timestamp = System.currentTimeMillis(),
+                report = payload
+            )
 
             if (response.isSuccessful) {
                 reportRepository.markReportAsSent(report.reportId)
@@ -142,13 +151,18 @@ class ReportUploadManager(private val context: Context) {
         )
     }
 
+    private fun isReportServerConfigured(): Boolean {
+        return Constants.BASE_URL != "https://your-report-server.com/api/" &&
+                Constants.REPORT_API_KEY.isNotBlank()
+    }
+
     /**
      * Creates the Retrofit API service instance with
      * logging and timeout configuration.
      */
     private fun createApiService(): ReportApiService {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.BASIC
         }
 
         val okHttpClient = OkHttpClient.Builder()

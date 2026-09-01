@@ -44,6 +44,9 @@ object Constants {
     // Replace with your actual server URL when ready
     const val BASE_URL = "https://your-report-server.com/api/"
     const val REPORT_ENDPOINT = "reports/submit"
+    const val REPORT_API_KEY = ""
+    const val REPORT_API_KEY_HEADER = "X-API-Key"
+    const val REPORT_TIMESTAMP_HEADER = "X-Timestamp"
 
     // ── Gemma Model ──────────────────────────────────────────────
     const val GEMMA_MODEL_PATH = "gemma/gemma3-1b-it-int4.task"

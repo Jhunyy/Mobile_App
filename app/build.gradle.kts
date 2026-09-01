@@ -39,6 +39,10 @@ android {
     buildFeatures {
         viewBinding = true  // enables ViewBinding for XML layouts
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

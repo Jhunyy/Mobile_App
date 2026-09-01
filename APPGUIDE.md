@@ -74,8 +74,8 @@ app/src/main/java/com/apcida/smishingdetector/
 |   +-- data/            DetectionResult, GemmaResult, RiskLevel
 |
 +-- view/
-|   +-- activity/        MainActivity, SplashActivity, OnboardingActivity
-|   +-- fragment/        Messages, Message Detail, Report Logs, Safety Tips
+|   +-- activity/        MainActivity
+|   +-- fragment/        Onboarding, Messages, Message Detail, Report Logs, Safety Tips
 |   +-- adapter/         RecyclerView adapters
 |   +-- dialog/          Scam alert, safe notification, report form
 |
@@ -151,6 +151,74 @@ The app currently requests/declares:
 
 SMS permissions are required for the receiver and message scanning flow.
 
+## Report Server Design
+
+Report upload is designed as a separate backend service from the Android app. The mobile app performs SMS detection locally, then sends only anonymized report metadata when the user submits a report.
+
+The recommended prototype authentication design is API key plus timestamp validation:
+
+```text
+Android app
+    |
+    | HTTPS report request
+    | Headers: X-API-Key, X-Timestamp
+    v
+Report server
+    |
+    +-- reject request if API key is invalid
+    +-- reject request if timestamp is stale
+    +-- store anonymized report metadata if valid
+```
+
+This validates that the report request came from an authorized app client. It does not validate the SMS message itself; the message classification is still produced by the on-device keyword and Gemma detection pipeline.
+
+Prototype limitation: because the shared API key is packaged with the Android app, it could be extracted from the APK by a skilled attacker. This is acceptable for the thesis prototype if documented, but a production system should use stronger authentication.
+
+The Android client keeps report uploads pending until both values are configured:
+
+```kotlin
+const val BASE_URL = "https://your-report-server.com/api/"
+const val REPORT_API_KEY = ""
+```
+
+Recommended hosting approach:
+
+1. Render or Railway with Node/Express and hosted Postgres. Best default for this thesis prototype because it is simple to deploy from GitHub, matches the Android Retrofit REST client, and provides enough database support for flagged-message reports.
+2. Firebase Cloud Functions with Firestore. Good if the team wants less server management, but it adds Firebase-specific tooling and data modeling.
+3. University VPS or on-campus server. Academically nice if MSU-IIT can provide quick access and setup support.
+4. Self-managed VPS. More control, but more work than needed for a defense-scope report endpoint.
+
+Minimal server endpoint:
+
+```text
+POST /api/reports/submit
+Headers:
+  X-API-Key: <shared app/reporting key>
+  X-Timestamp: <request timestamp>
+Body:
+  anonymized report metadata only
+```
+
+Server responsibilities:
+
+- Reject missing or invalid API keys.
+- Reject stale timestamps.
+- Store only anonymized report metadata.
+- Return a clear success/failure JSON response.
+
+Current Android retry behavior:
+
+- `ReportUploadManager` attempts uploads on app startup.
+- `ReportUploadManager` attempts uploads immediately after a user submits a report.
+- If the device is offline, the server URL is still a placeholder, or the API key is empty, reports stay pending in Room.
+
+Planned retry improvement:
+
+- Add Android WorkManager.
+- Schedule a report upload worker after report submission.
+- Use a network constraint so the worker runs only when internet is available.
+- Keep failed reports pending for later retry.
+
 ## What I Like About This Project
 
 - The two-stage design is practical: keyword filtering keeps the app fast, while Gemma is reserved for higher-risk messages.
@@ -163,22 +231,22 @@ SMS permissions are required for the receiver and message scanning flow.
 
 These are based on the current repository state:
 
-- `DatabaseSeeder.kt` reads `safety_tips_seed.xml`, but the assets folder currently contains `safety_tips.xml`. Either rename the asset or update the seeder.
-- `GemmaValidator.kt` has comments that still mention Gemma 2B and assets loading, but the active path uses Gemma 3 1B INT4 from internal storage or `/data/local/tmp/llm`.
-- `SmsController.triggerScamAlert()` is still a TODO. Scam detection is logged, but the actual notification helper is not implemented yet.
-- `MainActivity` creates and loads one `GemmaValidator`, while `SmsController` creates a separate `GemmaValidator`. That means the receiver-side validator may not share the model instance loaded at startup.
-- `SplashActivity.kt` exists, but `MainActivity` is currently the launcher in `AndroidManifest.xml`.
-- `OnboardingActivity` is stored under `view/activity`, but it is used as a navigation fragment in `nav_graph.xml`. Consider renaming it to `OnboardingFragment` for clarity.
 - `BASE_URL` is still the placeholder `https://your-report-server.com/api/`.
+- `REPORT_API_KEY` is still empty until the report server secret is finalized.
 
 ## Near-Term Roadmap
 
-- Fix the safety tips seed filename mismatch.
+- Fix the safety tips seed filename mismatch. Done.
+- Confirm local unit tests and debug APK build work. Done.
+- Add focused unit tests for risk scoring, thresholding, and Gemma output parsing. Done.
 - Confirm Room seeding works on a fresh install.
 - Confirm Gemma model loading on a physical device through Logcat.
-- Make Gemma loading shared or injectable so SMS processing uses the loaded model.
-- Implement notification display for scam results.
-- Connect report submission from the detail/report form flow to `ReportUploadManager`.
+- Make Gemma loading shared or injectable so SMS processing uses the loaded model. Done.
+- Implement notification display for scam results. Done.
+- Connect report submission from the detail/report form flow to `ReportUploadManager`. Done.
+- Add WorkManager-based automatic retry for pending report uploads.
+- Rename `OnboardingActivity` to `OnboardingFragment` for clearer navigation structure. Done.
+- Remove unused `SplashActivity` placeholder and keep `MainActivity` as launcher. Done.
 - Run full pipeline testing: receive SMS -> keyword match -> risk score -> Gemma validation -> saved result -> alert/report.
 - Prepare evaluation data for Chapter 5: accuracy, latency, false positives, false negatives, and usability feedback.
 
@@ -201,6 +269,32 @@ Recommended manual test cases:
 - Multipart SMS message.
 - Duplicate SMS content.
 - Report submission while offline, then retry with internet available.
+
+## Physical Device Test Checklist
+
+Use this when an Android phone is available:
+
+- Install the debug APK on the phone.
+- Grant SMS and notification permissions.
+- Push `gemma3-1b-it-int4.task` to `/data/local/tmp/llm/`.
+- Confirm Logcat shows Gemma model loading or a clear fallback reason.
+- Send a safe SMS sample and confirm it is saved as `SAFE`.
+- Send suspicious/scam SMS samples and confirm keyword matches, score, Gemma result, and notification behavior.
+- Open the notification and confirm it navigates to the message detail screen.
+- Submit a report while offline and confirm it remains `Pending`.
+- Reconnect internet and confirm report upload retry behavior when the server is configured.
+
+## Report Server Setup Checklist
+
+Use this when the separate report server is ready:
+
+- Replace `BASE_URL` with the server API base URL.
+- Set `REPORT_API_KEY` to the agreed shared secret for the prototype.
+- Make the server require `X-API-Key` and `X-Timestamp` headers.
+- Reject requests with an invalid key or stale timestamp.
+- Confirm the server stores only anonymized report metadata.
+- Test a successful report upload and confirm the local report changes from `Pending` to `Sent`.
+- Test an invalid API key and confirm the app leaves the report pending for retry.
 
 ## Thesis Notes
 

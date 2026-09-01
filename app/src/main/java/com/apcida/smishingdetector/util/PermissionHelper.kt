@@ -4,12 +4,14 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 object PermissionHelper {
 
     const val SMS_PERMISSION_REQUEST_CODE = 101
+    const val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
 
     /**
      * Checks if both RECEIVE_SMS and READ_SMS
@@ -53,6 +55,24 @@ object PermissionHelper {
                 Manifest.permission.READ_SMS
             ),
             SMS_PERMISSION_REQUEST_CODE
+        )
+    }
+
+    fun hasNotificationPermission(context: Context): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun requestNotificationPermission(activity: Activity) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST_CODE
         )
     }
 
