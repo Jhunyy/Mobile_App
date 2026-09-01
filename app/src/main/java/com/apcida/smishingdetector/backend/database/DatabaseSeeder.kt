@@ -105,14 +105,14 @@ class DatabaseSeeder(
     }
 
     /**
-     * Reads safety_tips_seed.xml and inserts all tip entries
+     * Reads safety_tips.xml and inserts all tip entries
      * into the safety_tips table.
      */
     private suspend fun seedSafetyTips() {
         val tips = mutableListOf<SafetyTip>()
 
         try {
-            val parser = getXmlParser("safety_tips_seed.xml")
+            val parser = getXmlParser("safety_tips.xml")
             var eventType = parser.eventType
 
             var title = ""
