@@ -11,10 +11,11 @@ import androidx.navigation.ui.setupWithNavController
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
-import com.apcida.smishingdetector.backend.gemma.GemmaValidator
+import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.network.ReportUploadManager
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
 import com.apcida.smishingdetector.util.PermissionHelper
+import com.apcida.smishingdetector.view.fragment.OnboardingFragment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,7 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var navController: NavController
-    private lateinit var gemmaValidator: GemmaValidator
     private val reportUploadManager by lazy {
         ReportUploadManager(applicationContext)
     }
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
         seedDatabase()
         loadGemmaModel()
         uploadPendingReports()
-        requestSmsPermissions()
+        requestRequiredPermissions()
     }
 
     private fun setupNavigation() {
@@ -68,8 +68,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadGemmaModel() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                gemmaValidator = GemmaValidator(applicationContext)
-                gemmaValidator.loadModel()
+                GemmaManager.loadModel(applicationContext)
                 Log.d(TAG, "Gemma model loaded.")
             } catch (e: Exception) {
                 Log.e(TAG, "Gemma model load failed: ${e.message}")
@@ -87,11 +86,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestSmsPermissions() {
+    private fun requestRequiredPermissions() {
         if (!PermissionHelper.hasSmsPermissions(this)) {
             PermissionHelper.requestSmsPermissions(this)
         } else {
             Log.d(TAG, "SMS permissions already granted.")
+            requestNotificationPermissionIfNeeded()
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (!PermissionHelper.hasNotificationPermission(this)) {
+            PermissionHelper.requestNotificationPermission(this)
+        } else {
+            Log.d(TAG, "Notification permission already granted or not required.")
         }
     }
 
@@ -112,9 +120,11 @@ class MainActivity : AppCompatActivity() {
                     ?.childFragmentManager
                     ?.primaryNavigationFragment
 
-                if (currentFragment is OnboardingActivity) {
+                if (currentFragment is OnboardingFragment) {
                     currentFragment.onPermissionGranted()
                 }
+
+                requestNotificationPermissionIfNeeded()
 
             } else {
                 Log.w(TAG, "SMS permissions denied.")
@@ -122,14 +132,18 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.onboardingFragment)
                 }
             }
+        } else if (requestCode == PermissionHelper.NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (PermissionHelper.allPermissionsGranted(grantResults)) {
+                Log.d(TAG, "Notification permission granted.")
+            } else {
+                Log.w(TAG, "Notification permission denied.")
+            }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::gemmaValidator.isInitialized) {
-            gemmaValidator.release()
-        }
+        GemmaManager.release()
     }
 
     override fun onSupportNavigateUp(): Boolean {

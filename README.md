@@ -41,8 +41,8 @@ app/src/main/java/com/apcida/smishingdetector/
 │   └── data/                    # DetectionResult, GemmaResult, RiskLevel enum
 │
 ├── view/                        # UI layer
-│   ├── activity/                # SplashActivity, OnboardingActivity, MainActivity
-│   ├── fragment/                # MessagesFragment, MessageDetailFragment, ReportLogsFragment, SafetyTipsFragment
+│   ├── activity/                # MainActivity
+│   ├── fragment/                # OnboardingFragment, MessagesFragment, MessageDetailFragment, ReportLogsFragment, SafetyTipsFragment
 │   ├── dialog/                  # ScamAlertDialog, SafeNotificationDialog, ReportFormDialog
 │   └── adapter/                 # RecyclerView adapters
 │
@@ -136,6 +136,23 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 - `Constants.RISK_THRESHOLD` defaults to `60f`; calibrate during testing.
 - Privacy by design: raw SMS content never leaves the device. Only anonymized metadata is sent when a report is submitted.
 
+## Report Server Plan
+
+Report collection is handled by a separate server, not by the Android app itself. When a user submits a report, the app sends anonymized report metadata to the configured `BASE_URL` over HTTPS.
+
+For the thesis prototype, report submissions should be authenticated with a shared API key and timestamp:
+
+```text
+X-API-Key: <shared app/reporting key>
+X-Timestamp: <request timestamp>
+```
+
+The server checks the API key and rejects stale timestamps before accepting the report. This validates that the report request came from an authorized app client, while the SMS detection decision itself still comes from the on-device keyword and Gemma pipeline.
+
+Recommended hosting for the prototype: **Render or Railway with a small Node/Express REST API and hosted Postgres**. This keeps deployment simple, works naturally with Retrofit, and is enough for accepting flagged-message reports during thesis evaluation. Firebase Cloud Functions + Firestore is a reasonable second option if the team wants less server management, while a university VPS is useful only if access and setup support are readily available.
+
+Current retry behavior is simple: the app attempts to upload pending reports on app startup and immediately after a report is submitted. If the device is offline or the server is not configured, reports remain pending in Room. The planned improvement is to use Android WorkManager with a network constraint so pending reports automatically retry when internet becomes available.
+
 ## Roadmap
 
 - [x] Project setup, Room database, XML seed data
@@ -143,6 +160,6 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 - [x] Core UI: message list, detail view, alert dialogs
 - [x] Gemma integration (Stage 2 on-device validation)
 - [ ] Report submission + upload manager polish
+- [ ] WorkManager-based automatic report retry
 - [ ] Safety tips screen + UI polish
 - [ ] Full pipeline testing and user evaluation
-

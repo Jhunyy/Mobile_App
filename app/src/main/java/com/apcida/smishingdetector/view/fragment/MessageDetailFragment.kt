@@ -5,9 +5,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.backend.network.ReportUploadManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
@@ -24,6 +27,7 @@ class MessageDetailFragment : Fragment() {
 
     private lateinit var messageRepository: MessageRepository
     private lateinit var reportRepository: ReportRepository
+    private lateinit var reportUploadManager: ReportUploadManager
     private var currentMessage: Message? = null
 
     override fun onCreateView(
@@ -51,6 +55,7 @@ class MessageDetailFragment : Fragment() {
         val database = AppDatabase.getInstance(requireContext())
         messageRepository = MessageRepository(database.messageDao())
         reportRepository = ReportRepository(database.reportDao())
+        reportUploadManager = ReportUploadManager(requireContext().applicationContext)
     }
 
     private fun loadMessage(messageId: Long) {
@@ -118,14 +123,14 @@ class MessageDetailFragment : Fragment() {
                 currentMessage?.let { message ->
                     viewLifecycleOwner.lifecycleScope.launch {
                         messageRepository.deleteMessage(message)
-                        requireActivity().onBackPressed()
+                        findNavController().navigateUp()
                     }
                 }
             }
 
             // Ignore button
             btnIgnore.setOnClickListener {
-                requireActivity().onBackPressed()
+                findNavController().navigateUp()
             }
         }
     }
@@ -157,6 +162,12 @@ class MessageDetailFragment : Fragment() {
                 isSent = false
             )
             reportRepository.insertReport(report)
+            Toast.makeText(
+                requireContext(),
+                "Report saved. Upload will run when the server is available.",
+                Toast.LENGTH_SHORT
+            ).show()
+            reportUploadManager.uploadPendingReports()
         }
     }
 

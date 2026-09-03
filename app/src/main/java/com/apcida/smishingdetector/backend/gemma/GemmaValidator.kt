@@ -80,9 +80,7 @@ class GemmaValidator(private val context: Context) {
     }
 
     /**
-     * Returns the internal storage file path for the Gemma model.
-     * MediaPipe requires the model to be in internal storage,
-     * not directly in assets.
+     * Returns the preferred local file path for the Gemma model.
      */
     private fun getModelFile(): File {
         // Primary location — internal app storage (after first copy)
@@ -96,14 +94,17 @@ class GemmaValidator(private val context: Context) {
         return internalFile
     }
     /**
-     * Loads the Gemma 2B model from the assets folder.
-     * Should be called once at app startup (from MainActivity).
-     * Model loading is heavy — runs on IO dispatcher.
+     * Loads the Gemma 3 1B INT4 model from internal storage or the adb push path.
+     * Model loading is heavy, so this runs on the IO dispatcher.
      */
-
     suspend fun loadModel() {
         withContext(Dispatchers.IO) {
             try {
+                if (isModelLoaded && llmInference != null) {
+                    Log.d(TAG, "Gemma model is already loaded.")
+                    return@withContext
+                }
+
                 if (isEmulator()) {
                     Log.w(TAG, "Emulator detected. Skipping Gemma.")
                     isModelLoaded = false
@@ -155,28 +156,6 @@ class GemmaValidator(private val context: Context) {
                     var bytesRead: Int
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
-                    }
-                }
-            }
-            Log.d(TAG, "Model copied to: ${destination.absolutePath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy model: ${e.message}")
-        }
-    }
-
-
-    /**
-     * Copies the Gemma model from assets to internal storage.
-     * This runs only once on first launch.
-     */
-    private fun copyModelFromAssets(destination: File) {
-        try {
-            context.assets.open("gemma/$MODEL_FILE_NAME").use { inputStream ->
-                destination.outputStream().use { outputStream ->
-                    val buffer = ByteArray(4096)
-                    var bytesRead: Int
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
                     }
                 }
             }

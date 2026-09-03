@@ -6,7 +6,7 @@ import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.detection.KeywordEngine
 import com.apcida.smishingdetector.backend.detection.RiskScorer
 import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
-import com.apcida.smishingdetector.backend.gemma.GemmaValidator
+import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.model.data.DetectionResult
 import com.apcida.smishingdetector.model.data.RiskLevel
@@ -14,6 +14,7 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.MessageKeyword
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.HashUtil
+import com.apcida.smishingdetector.util.NotificationHelper
 
 class SmsController(private val context: Context) {
 
@@ -26,7 +27,7 @@ class SmsController(private val context: Context) {
     private val keywordEngine = KeywordEngine(database.keywordDao())
     private val riskScorer = RiskScorer()
     private val thresholdEvaluator = ThresholdEvaluator()
-    private val gemmaValidator = GemmaValidator(context)
+    private val gemmaValidator = GemmaManager.getValidator(context)
 
     /**
      * Entry point called by SmsReceiver when a new SMS arrives.
@@ -138,15 +139,13 @@ class SmsController(private val context: Context) {
 
     /**
      * Triggers a system notification alerting the user of a detected scam.
-     * The notification is handled by the NotificationHelper (to be implemented).
      */
     private fun triggerScamAlert(
         context: Context,
         result: DetectionResult,
         messageId: Long
     ) {
-        // TODO: Implement NotificationHelper.showScamAlert(context, result, messageId)
-        // This will be connected when we build the notification system
+        NotificationHelper.showScamAlert(context, result, messageId)
         Log.d(TAG, "Alert triggered for message ID: $messageId")
         Log.d(TAG, "Rationale: ${result.finalRationale}")
     }

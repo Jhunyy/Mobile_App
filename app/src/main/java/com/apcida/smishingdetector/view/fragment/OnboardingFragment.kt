@@ -1,4 +1,4 @@
-package com.apcida.smishingdetector.view.activity
+package com.apcida.smishingdetector.view.fragment
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -10,7 +10,7 @@ import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ActivityOnboardingBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 
-class OnboardingActivity : Fragment() {
+class OnboardingFragment : Fragment() {
 
     private var _binding: ActivityOnboardingBinding? = null
     private val binding get() = _binding!!

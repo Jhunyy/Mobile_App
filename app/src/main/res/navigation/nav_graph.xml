@@ -47,7 +47,7 @@
     <!-- ── Onboarding / Permission Screen ────────────── -->
     <fragment
         android:id="@+id/onboardingFragment"
-        android:name="com.apcida.smishingdetector.view.activity.OnboardingActivity"
+        android:name="com.apcida.smishingdetector.view.fragment.OnboardingFragment"
         android:label="Setup"
         tools:layout="@layout/activity_onboarding" />
 

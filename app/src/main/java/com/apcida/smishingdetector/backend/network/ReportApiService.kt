@@ -1,7 +1,9 @@
 package com.apcida.smishingdetector.backend.network
 
+import com.apcida.smishingdetector.util.Constants
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 /**
@@ -13,8 +15,10 @@ import retrofit2.http.POST
  */
 interface ReportApiService {
 
-    @POST("reports/submit")
+    @POST(Constants.REPORT_ENDPOINT)
     suspend fun submitReport(
+        @Header(Constants.REPORT_API_KEY_HEADER) apiKey: String,
+        @Header(Constants.REPORT_TIMESTAMP_HEADER) timestamp: Long,
         @Body report: ReportPayload
     ): Response<ReportResponse>
 }
