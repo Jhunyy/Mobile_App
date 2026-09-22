@@ -21,10 +21,10 @@ class ThresholdEvaluatorTest {
     }
 
     @Test
-    fun shouldInvokeGemma_usesConfiguredRiskThreshold() {
-        assertFalse(evaluator.shouldInvokeGemma(Constants.RISK_THRESHOLD - 1f))
-        assertTrue(evaluator.shouldInvokeGemma(Constants.RISK_THRESHOLD))
-        assertTrue(evaluator.shouldInvokeGemma(Constants.RISK_THRESHOLD + 1f))
+    fun isHighRisk_usesConfiguredRiskThreshold() {
+        assertFalse(evaluator.isHighRisk(Constants.RISK_THRESHOLD - 1f))
+        assertTrue(evaluator.isHighRisk(Constants.RISK_THRESHOLD))
+        assertTrue(evaluator.isHighRisk(Constants.RISK_THRESHOLD + 1f))
     }
 
     @Test

@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavDeepLinkBuilder
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.model.data.DetectionResult
+import com.apcida.smishingdetector.model.data.RiskLevel
 import com.apcida.smishingdetector.view.activity.MainActivity
 
 object NotificationHelper {
@@ -43,13 +44,27 @@ object NotificationHelper {
             })
             .createPendingIntent()
 
+        val isRuleOnlyWarning = !result.gemmaInvoked
+        val title = when {
+            isRuleOnlyWarning -> "High-risk SMS detected"
+            result.riskLevel == RiskLevel.SUSPICIOUS -> "Suspicious SMS requires review"
+            else -> "Potential scam SMS detected"
+        }
+        val explanation = when {
+            isRuleOnlyWarning ->
+                "Rule analysis found strong scam indicators. AI analysis will refine the result."
+            result.riskLevel == RiskLevel.SUSPICIOUS ->
+                "AI reduced the initial high-risk warning to suspicious, but the message is not safe."
+            else ->
+                "Rule and AI results indicate a scam. Review the result before taking action."
+        }
         val notification = NotificationCompat.Builder(context, SCAM_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_warning)
-            .setContentTitle("Potential scam SMS detected")
+            .setContentTitle(title)
             .setContentText("Risk score: ${result.riskScore.toInt()}. Tap to review details.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("A message was classified as scam. Review the detection result before taking action.")
+                    .bigText(explanation)
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)

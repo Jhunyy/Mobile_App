@@ -9,13 +9,13 @@ data class GemmaResult(
 ) {
     companion object {
         // Returns a fallback result when Gemma fails or times out
-        fun fallback(): GemmaResult {
+        fun fallback(errorMessage: String = "Gemma inference failed, timed out, or was unavailable."): GemmaResult {
             return GemmaResult(
                 classification = "UNCERTAIN",
                 confidence = "LOW",
                 rationale = "Contextual analysis was unavailable. Classification based on keyword scoring only.",
                 isSuccessful = false,
-                errorMessage = "Gemma inference failed or timed out."
+                errorMessage = errorMessage
             )
         }
     }

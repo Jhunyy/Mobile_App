@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.controller.SmsController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class SmsReceiver : BroadcastReceiver() {
@@ -17,38 +19,39 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-
-        // Only process SMS_RECEIVED broadcasts
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
-        // Extract all SMS messages from the intent
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-
         if (messages.isNullOrEmpty()) {
-            Log.w(TAG, "Received SMS broadcast but no messages found.")
+            Log.w(TAG, "Received SMS broadcast without message parts.")
             return
         }
 
-        // Group multi-part messages by sender and combine their bodies
         val groupedMessages = mutableMapOf<String, StringBuilder>()
-
-        for (smsMessage in messages) {
+        messages.forEach { smsMessage ->
             val sender = smsMessage.originatingAddress ?: "Unknown"
-            val body = smsMessage.messageBody ?: ""
-            groupedMessages.getOrPut(sender) { StringBuilder() }.append(body)
+            groupedMessages.getOrPut(sender) { StringBuilder() }
+                .append(smsMessage.messageBody.orEmpty())
         }
 
-        // Pass each complete message to SmsController for detection pipeline
-        val controller = SmsController(context)
-
-        CoroutineScope(Dispatchers.IO).launch {
-            groupedMessages.forEach { (sender, bodyBuilder) ->
-                val messageBody = bodyBuilder.toString().trim()
-
-                if (messageBody.isNotEmpty()) {
-                    Log.d(TAG, "New SMS received from: $sender")
-                    controller.onSmsReceived(sender, messageBody)
+        val pendingResult = goAsync()
+        val appContext = context.applicationContext
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                val controller = SmsController(appContext)
+                groupedMessages.forEach { (sender, bodyBuilder) ->
+                    val body = bodyBuilder.toString().trim()
+                    if (body.isNotEmpty()) {
+                        val result = controller.receiveAndAnalyzeRules(sender, body)
+                        if (result.shouldEnqueueAi) {
+                            SmsProcessingWorker.enqueue(appContext, result.messageId)
+                        }
+                    }
                 }
+            } catch (error: Exception) {
+                Log.e(TAG, "Unable to persist and queue an incoming SMS.", error)
+            } finally {
+                pendingResult.finish()
             }
         }
     }

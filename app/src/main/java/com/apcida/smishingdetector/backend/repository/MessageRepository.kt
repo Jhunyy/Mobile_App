@@ -52,12 +52,17 @@ class MessageRepository(private val messageDao: MessageDao) {
         return messageDao.getMessageById(messageId)
     }
 
-    /**
-     * Checks for a duplicate message using its content hash.
-     * Returns the existing message or null if no duplicate found.
-     */
-    suspend fun getMessageByHash(hash: String): Message? {
-        return messageDao.getMessageByHash(hash)
+    fun observeMessageById(messageId: Long): Flow<Message?> {
+        return messageDao.observeMessageById(messageId)
+    }
+
+    suspend fun findRecentDuplicate(
+        senderHash: String,
+        contentHash: String,
+        notBefore: Long,
+        receivedAt: Long
+    ): Message? {
+        return messageDao.findRecentDuplicate(senderHash, contentHash, notBefore, receivedAt)
     }
 
     /**

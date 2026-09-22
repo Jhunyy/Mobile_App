@@ -29,6 +29,12 @@ data class Message(
     @ColumnInfo(name = "risk_level")
     val riskLevel: String = "SAFE",
 
+    @ColumnInfo(name = "deterministic_risk_level", defaultValue = "'SAFE'")
+    val deterministicRiskLevel: String = "SAFE",
+
+    @ColumnInfo(name = "matched_indicators", defaultValue = "''")
+    val matchedIndicators: String = "",
+
     @ColumnInfo(name = "is_flagged")
     val isFlagged: Boolean = false,
 
@@ -43,6 +49,15 @@ data class Message(
 
     @ColumnInfo(name = "gemma_rationale")
     val gemmaRationale: String? = null,
+
+    @ColumnInfo(name = "ai_analysis_status", defaultValue = "'NOT_STARTED'")
+    val aiAnalysisStatus: String = "NOT_STARTED",
+
+    @ColumnInfo(name = "processing_state", defaultValue = "'COMPLETED'")
+    val processingState: String = "PENDING",
+
+    @ColumnInfo(name = "final_classification", defaultValue = "'SAFE'")
+    val finalClassification: String = "SAFE",
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis()

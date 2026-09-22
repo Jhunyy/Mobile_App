@@ -16,9 +16,12 @@ import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.Report
+import com.apcida.smishingdetector.model.data.AiAnalysisStatus
+import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 class MessageDetailFragment : Fragment() {
 
@@ -60,10 +63,11 @@ class MessageDetailFragment : Fragment() {
 
     private fun loadMessage(messageId: Long) {
         viewLifecycleOwner.lifecycleScope.launch {
-            val message = messageRepository.getMessageById(messageId)
-            message?.let {
-                currentMessage = it
-                displayMessage(it)
+            messageRepository.observeMessageById(messageId).collectLatest { message ->
+                message?.let {
+                    currentMessage = it
+                    displayMessage(it)
+                }
             }
         }
     }
@@ -75,11 +79,12 @@ class MessageDetailFragment : Fragment() {
             textMessageContent.text = message.content
 
             // Risk status
-            textRiskStatus.text = message.riskLevel
-            textRiskScore.text = "Risk Score: ${message.riskScore.toInt()}"
+            textRiskStatus.text = message.finalClassification
+            textRiskScore.text =
+                "Rule result: ${message.deterministicRiskLevel} • Score: ${message.riskScore.toInt()}"
 
             // Risk card background color
-            val bgColor = when (message.riskLevel) {
+            val bgColor = when (message.finalClassification) {
                 Constants.RISK_SCAM -> Color.parseColor("#FFEBEE")
                 Constants.RISK_SUSPICIOUS -> Color.parseColor("#FFF3E0")
                 else -> Color.parseColor("#E8F5E9")
@@ -87,18 +92,33 @@ class MessageDetailFragment : Fragment() {
             cardRiskStatus.setCardBackgroundColor(bgColor)
 
             // Risk status text color
-            val textColor = when (message.riskLevel) {
+            val textColor = when (message.finalClassification) {
                 Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
                 Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
                 else -> Color.parseColor("#2E7D32")
             }
             textRiskStatus.setTextColor(textColor)
 
-            // Gemma analysis — only show if Gemma was invoked
-            if (message.gemmaInvoked && !message.gemmaRationale.isNullOrEmpty()) {
+            val isAnalyzing = message.processingState in setOf(
+                ProcessingState.PENDING.name,
+                ProcessingState.RULE_ANALYZED.name,
+                ProcessingState.AI_QUEUED.name,
+                ProcessingState.AI_ANALYZING.name
+            )
+            if (isAnalyzing) {
+                cardGemmaAnalysis.visibility = View.VISIBLE
+                textGemmaRationale.text = "On-device AI analysis is in progress."
+                textGemmaConfidence.text = "Status: Analyzing"
+            } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
                 cardGemmaAnalysis.visibility = View.VISIBLE
                 textGemmaRationale.text = message.gemmaRationale
-                textGemmaConfidence.text = "Confidence: ${message.gemmaConfidence ?: "N/A"}"
+                    ?: "AI analysis is unavailable; the deterministic result was preserved."
+                textGemmaConfidence.text = "Status: AI unavailable"
+            } else if (message.gemmaInvoked && !message.gemmaRationale.isNullOrEmpty()) {
+                cardGemmaAnalysis.visibility = View.VISIBLE
+                textGemmaRationale.text = message.gemmaRationale
+                textGemmaConfidence.text =
+                    "${message.gemmaClassification} • Confidence: ${message.gemmaConfidence ?: "N/A"}"
             } else {
                 cardGemmaAnalysis.visibility = View.GONE
             }

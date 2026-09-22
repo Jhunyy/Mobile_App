@@ -3,8 +3,8 @@ package com.apcida.smishingdetector.util
 object Constants {
 
     // ── Detection Threshold ──────────────────────────────────────
-    // Messages with risk score >= this value trigger Stage 2 Gemma
-    // Calibrate this during testing — start at 60
+    // Messages with risk score >= this value are high risk by deterministic
+    // analysis. Gemma is invoked for every message regardless of this value.
     const val RISK_THRESHOLD = 60f
 
     // ── Keyword Weight Reference ─────────────────────────────────
@@ -51,6 +51,7 @@ object Constants {
     // ── Gemma Model ──────────────────────────────────────────────
     const val GEMMA_MODEL_PATH = "gemma/gemma3-1b-it-int4.task"
     const val GEMMA_MAX_TOKENS = 200
+    const val GEMMA_TIMEOUT_MILLIS = 90_000L
     //const val GEMMA_TEMPERATURE = 0.1f  // low = more deterministic output
 
     // ── Database ─────────────────────────────────────────────────

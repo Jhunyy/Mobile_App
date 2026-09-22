@@ -16,6 +16,6 @@ data class DetectionResult(
     val gemmaResult: GemmaResult? = null,
 
     // Final combined verdict
-    val finalClassification: String,   // "SAFE", "SCAM", or "LEGITIMATE"
+    val finalClassification: String,   // "SAFE", "SUSPICIOUS", or "SCAM"
     val finalRationale: String?        // Gemma rationale or null if not invoked
 )

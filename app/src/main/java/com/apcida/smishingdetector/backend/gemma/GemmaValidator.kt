@@ -6,6 +6,8 @@ import com.apcida.smishingdetector.model.data.GemmaResult
 import com.apcida.smishingdetector.util.Constants
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -18,6 +20,7 @@ class GemmaValidator(private val context: Context) {
 
     private var llmInference: LlmInference? = null
     private var isModelLoaded = false
+    private val inferenceMutex = Mutex()
 
     /**
      * Detects if the app is running on an Android emulator.
@@ -49,32 +52,28 @@ class GemmaValidator(private val context: Context) {
         matchedKeywords: List<String>
     ): GemmaResult {
         return withContext(Dispatchers.IO) {
-            try {
-                if (!isModelLoaded || llmInference == null) {
-                    Log.w(TAG, "Gemma model not loaded. Returning fallback result.")
-                    return@withContext GemmaResult.fallback()
+            inferenceMutex.withLock {
+                try {
+                    if (!isModelLoaded || llmInference == null) {
+                        Log.w(TAG, "Gemma model not loaded. Returning fallback result.")
+                        return@withLock GemmaResult.fallback()
+                    }
+
+                    // Build structured prompt
+                    val prompt = PromptBuilder.build(messageBody, matchedKeywords)
+                    Log.d(TAG, "Prompt built. Running Gemma inference...")
+
+                    // Run inference
+                    val rawOutput = llmInference!!.generateResponse(prompt)
+
+                    // Strict parsing validates supported labels, confidence,
+                    // rationale presence, and rejects all additional output.
+                    GemmaOutputParser.parse(rawOutput)
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Gemma inference failed: ${e.message}")
+                    GemmaResult.fallback()
                 }
-
-                // Build structured prompt
-                val prompt = PromptBuilder.build(messageBody, matchedKeywords)
-                Log.d(TAG, "Prompt built. Running Gemma inference...")
-
-                // Run inference
-                val rawOutput = llmInference!!.generateResponse(prompt)
-                Log.d(TAG, "Gemma raw output: $rawOutput")
-
-                // Validate output format
-                if (!GemmaOutputParser.isValidFormat(rawOutput)) {
-                    Log.w(TAG, "Gemma output format is invalid. Returning fallback.")
-                    return@withContext GemmaResult.fallback()
-                }
-
-                // Parse and return structured result
-                GemmaOutputParser.parse(rawOutput)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Gemma inference failed: ${e.message}")
-                GemmaResult.fallback()
             }
         }
     }

@@ -36,9 +36,28 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     suspend fun getMessageById(messageId: Long): Message?
 
-    // Check for duplicate message by content hash
-    @Query("SELECT * FROM messages WHERE content_hash = :hash LIMIT 1")
-    suspend fun getMessageByHash(hash: String): Message?
+    @Query("SELECT * FROM messages WHERE message_id = :messageId")
+    fun observeMessageById(messageId: Long): Flow<Message?>
+
+    // Suppress duplicate broadcasts only for the same sender/content in a
+    // bounded window. A legitimate repeated SMS outside the window is kept.
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE sender_hash = :senderHash
+          AND content_hash = :contentHash
+          AND received_at >= :notBefore
+          AND received_at <= :receivedAt
+        ORDER BY received_at DESC
+        LIMIT 1
+        """
+    )
+    suspend fun findRecentDuplicate(
+        senderHash: String,
+        contentHash: String,
+        notBefore: Long,
+        receivedAt: Long
+    ): Message?
 
     // Delete all messages — used in testing/reset
     @Query("DELETE FROM messages")

@@ -21,6 +21,17 @@ interface MessageKeywordDao {
     @Query("SELECT * FROM message_keywords WHERE message_id = :messageId")
     suspend fun getMatchesForMessage(messageId: Long): List<MessageKeyword>
 
+    @Query(
+        """
+        SELECT keywords.pattern FROM keywords
+        INNER JOIN message_keywords
+            ON keywords.keyword_id = message_keywords.keyword_id
+        WHERE message_keywords.message_id = :messageId
+        ORDER BY message_keywords.id
+        """
+    )
+    suspend fun getMatchedPatterns(messageId: Long): List<String>
+
     // Get all messages that matched a specific keyword
     @Query("SELECT * FROM message_keywords WHERE keyword_id = :keywordId")
     suspend fun getMessagesForKeyword(keywordId: Long): List<MessageKeyword>

@@ -18,11 +18,7 @@ class KeywordEngine(private val keywordDao: KeywordDao) {
      * exists anywhere within the message body.
      */
     suspend fun analyze(messageBody: String): List<Keyword> {
-        val normalizedBody = messageBody
-            .lowercase()
-            .trim()
-
-        Log.d(TAG, "Analyzing message: ${normalizedBody.take(50)}...")
+        Log.d(TAG, "Analyzing normalized SMS content.")
 
         // Load all active keywords from database
         val allKeywords = keywordDao.getAllActiveKeywords()
@@ -32,13 +28,12 @@ class KeywordEngine(private val keywordDao: KeywordDao) {
         val matched = mutableListOf<Keyword>()
 
         for (keyword in allKeywords) {
-            val normalizedPattern = keyword.pattern.lowercase().trim()
-
-            if (normalizedBody.contains(normalizedPattern)) {
+            if (KeywordPatternMatcher.matches(messageBody, keyword.pattern, keyword.patternType)) {
                 matched.add(keyword)
-                Log.d(TAG, "Matched keyword: '${keyword.pattern}' | Weight: ${keyword.weight}")
             }
         }
+
+        matched.addAll(UrlIndicatorDetector.detect(messageBody, matched))
 
         Log.d(TAG, "Total matches found: ${matched.size}")
         return matched

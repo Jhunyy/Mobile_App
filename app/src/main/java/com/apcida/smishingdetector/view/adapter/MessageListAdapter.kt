@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.apcida.smishingdetector.databinding.ItemMessageBinding
 import com.apcida.smishingdetector.model.entity.Message
+import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.DateUtil
 import java.text.SimpleDateFormat
@@ -38,6 +39,12 @@ class MessageListAdapter(
 
         fun bind(message: Message) {
             binding.apply {
+                val isAnalyzing = message.processingState in setOf(
+                    ProcessingState.PENDING.name,
+                    ProcessingState.RULE_ANALYZED.name,
+                    ProcessingState.AI_QUEUED.name,
+                    ProcessingState.AI_ANALYZING.name
+                )
 
                 // Sender — show hashed sender as placeholder
                 // since raw sender is not stored
@@ -50,21 +57,23 @@ class MessageListAdapter(
                 textTime.text = formatTime(message.receivedAt)
 
                 // Risk indicator dot color
-                val indicatorColor = when (message.riskLevel) {
-                    Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                    Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
+                val indicatorColor = when {
+                    isAnalyzing -> Color.parseColor("#1565C0")
+                    message.finalClassification == Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
+                    message.finalClassification == Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
                     else -> Color.parseColor("#2E7D32")
                 }
                 riskIndicator.setBackgroundColor(indicatorColor)
 
                 // Risk badge
-                if (message.isFlagged) {
+                if (isAnalyzing || message.isFlagged) {
                     textRiskBadge.visibility = View.VISIBLE
-                    textRiskBadge.text = message.riskLevel
+                    textRiskBadge.text = if (isAnalyzing) "ANALYZING" else message.finalClassification
 
-                    val badgeColor = when (message.riskLevel) {
-                        Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                        Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
+                    val badgeColor = when {
+                        isAnalyzing -> Color.parseColor("#1565C0")
+                        message.finalClassification == Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
+                        message.finalClassification == Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
                         else -> Color.parseColor("#2E7D32")
                     }
                     textRiskBadge.setBackgroundColor(badgeColor)

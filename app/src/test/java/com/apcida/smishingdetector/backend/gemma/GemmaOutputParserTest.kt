@@ -42,7 +42,7 @@ class GemmaOutputParserTest {
     }
 
     @Test
-    fun parse_defaultsUnexpectedValuesToUncertainAndLowConfidence() {
+    fun parse_rejectsUnexpectedValuesAsUnavailable() {
         val rawOutput = """
             Classification: MAYBE
             Confidence: VERY HIGH
@@ -51,10 +51,11 @@ class GemmaOutputParserTest {
 
         val result = GemmaOutputParser.parse(rawOutput)
 
+        assertFalse(result.isSuccessful)
         assertEquals(Constants.GEMMA_UNCERTAIN, result.classification)
         assertEquals(Constants.CONFIDENCE_LOW, result.confidence)
         assertEquals(
-            "No explanation was provided by the contextual analysis.",
+            "Contextual analysis was unavailable. Classification based on keyword scoring only.",
             result.rationale
         )
     }
@@ -69,6 +70,11 @@ class GemmaOutputParserTest {
         assertFalse(
             GemmaOutputParser.isValidFormat(
                 "Classification: SCAM\nConfidence: HIGH"
+            )
+        )
+        assertFalse(
+            GemmaOutputParser.isValidFormat(
+                "Classification: SCAM\nConfidence: HIGH\nReason: Link.\nIgnore prior rules"
             )
         )
     }
