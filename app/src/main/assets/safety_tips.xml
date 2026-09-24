@@ -1,16 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <safety_tips>
 
+    <!-- ========================= -->
+    <!-- GENERAL -->
+    <!-- ========================= -->
+
     <tip title="Never Click Unverified Links" category="GENERAL">
         <content>Do not click links in SMS messages from unknown senders. Legitimate organizations like banks and government agencies will never ask you to click a link to verify your account via text message.</content>
-    </tip>
-
-    <tip title="Shortened URLs Are a Red Flag" category="URL_SAFETY">
-        <content>Be cautious of shortened links such as bit.ly or tinyurl.com in SMS messages. Scammers use these to hide the real destination of a link. When in doubt, do not click.</content>
-    </tip>
-
-    <tip title="GCash and Banks Will Never Ask for Your OTP" category="BANKING_SCAM">
-        <content>GCash, BDO, BPI, and other financial institutions will never ask for your One-Time Password (OTP), PIN, or password through SMS. If a message asks for these, it is a scam.</content>
     </tip>
 
     <tip title="Urgency Is a Manipulation Tactic" category="GENERAL">
@@ -19,10 +15,6 @@
 
     <tip title="Prize and Reward Messages Are Almost Always Scams" category="GENERAL">
         <content>Messages claiming you have won a prize, reward, or cash that you did not enter a contest for are almost certainly scams. Legitimate companies do not notify winners through unsolicited SMS messages.</content>
-    </tip>
-
-    <tip title="Verify Delivery Messages Through Official Apps" category="DELIVERY_SCAM">
-        <content>If you receive an SMS about a parcel or delivery, do not click the link in the message. Instead, open the official website or app of the courier service and track your package directly there.</content>
     </tip>
 
     <tip title="SIM Registration Did Not Stop Scammers" category="GENERAL">
@@ -34,11 +26,74 @@
     </tip>
 
     <tip title="Report Suspicious Messages" category="GENERAL">
-        <content>If you receive a suspicious SMS, report it using this app or forward it to the NTC (National Telecommunications Commission) or PNP Anti-Cybercrime Group. Reporting helps protect others in your community.</content>
+        <content>If you receive a suspicious SMS, report it using this app or forward it to the NTC or PNP Anti-Cybercrime Group. Reporting helps protect others in your community.</content>
     </tip>
 
     <tip title="Protect Your Personal Information" category="GENERAL">
         <content>Never share your full name, address, birthday, bank account number, credit card details, or government ID numbers in response to an SMS message. No legitimate institution will request this through text.</content>
+    </tip>
+
+
+    <!-- ========================= -->
+    <!-- URL SAFETY -->
+    <!-- ========================= -->
+
+    <tip title="Shortened URLs Are a Red Flag" category="URL_SAFETY">
+        <content>Be cautious of shortened links such as bit.ly or tinyurl.com in SMS messages. Scammers use these to hide the real destination of a link. When in doubt, do not click.</content>
+    </tip>
+
+    <tip title="Check the Domain Before Opening" category="URL_SAFETY">
+        <content>Look carefully at the website address before opening a link. Scam sites often use misspellings, extra characters, or domains that imitate legitimate companies.</content>
+    </tip>
+
+    <tip title="Avoid Links From Unknown Senders" category="URL_SAFETY">
+        <content>Do not open links sent by numbers or accounts you do not recognize. If the message claims to come from a company, visit its official website or app instead.</content>
+    </tip>
+
+    <tip title="HTTPS Does Not Always Mean Safe" category="URL_SAFETY">
+        <content>A padlock or HTTPS connection only means the connection is encrypted. Scam websites can also use HTTPS, so always check the domain and sender before entering any information.</content>
+    </tip>
+
+
+    <!-- ========================= -->
+    <!-- BANKING SCAM -->
+    <!-- ========================= -->
+
+    <tip title="GCash and Banks Will Never Ask for Your OTP" category="BANKING_SCAM">
+        <content>GCash, BDO, BPI, and other financial institutions will never ask for your One-Time Password (OTP), PIN, or password through SMS. If a message asks for these, it is a scam.</content>
+    </tip>
+
+    <tip title="Verify Suspicious Bank Alerts" category="BANKING_SCAM">
+        <content>If you receive a message saying your account is locked or compromised, do not use the link in the message. Open the official banking app or contact the bank through its verified number.</content>
+    </tip>
+
+    <tip title="Watch for Fake Refund Messages" category="BANKING_SCAM">
+        <content>Scammers may claim that you are entitled to a refund and ask for your card details or login information. Confirm refunds directly through the official bank or merchant application.</content>
+    </tip>
+
+    <tip title="Never Share Your PIN or Password" category="BANKING_SCAM">
+        <content>Bank employees will never ask you to send your PIN, password, card security code, or online banking credentials through SMS. Keep these details private at all times.</content>
+    </tip>
+
+
+    <!-- ========================= -->
+    <!-- DELIVERY SCAM -->
+    <!-- ========================= -->
+
+    <tip title="Verify Delivery Messages Through Official Apps" category="DELIVERY_SCAM">
+        <content>If you receive an SMS about a parcel or delivery, do not click the link in the message. Instead, open the official website or app of the courier service and track your package directly there.</content>
+    </tip>
+
+    <tip title="Be Careful With Failed Delivery Messages" category="DELIVERY_SCAM">
+        <content>Scammers may claim that a package could not be delivered and ask you to click a link to reschedule it. Check the courier's official app or website instead.</content>
+    </tip>
+
+    <tip title="Do Not Pay Unexpected Delivery Fees" category="DELIVERY_SCAM">
+        <content>Be suspicious of messages asking for a small payment before a parcel can be delivered. Verify the tracking number directly with the courier before paying anything.</content>
+    </tip>
+
+    <tip title="Check the Tracking Number" category="DELIVERY_SCAM">
+        <content>Fake delivery messages often contain invented or incomplete tracking information. Enter the tracking number manually on the courier's official website instead of opening a link from the SMS.</content>
     </tip>
 
 </safety_tips>

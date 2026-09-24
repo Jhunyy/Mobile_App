@@ -1,83 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
+
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginHorizontal="12dp"
-    android:layout_marginVertical="4dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    android:layout_height="96dp"
+    android:background="@android:color/transparent"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="12dp">
+    <!-- Risk color circle -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_indicator"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        app:cardCornerRadius="29dp"
+        app:cardElevation="2dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Risk indicator dot -->
+        <!-- IMPORTANT: required by MessageListAdapter -->
         <View
             android:id="@+id/risk_indicator"
-            android:layout_width="12dp"
-            android:layout_height="12dp"
-            android:background="@drawable/circle_indicator"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/color_safe" />
 
-        <!-- Sender -->
-        <TextView
-            android:id="@+id/text_sender"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@id/text_time"
-            app:layout_constraintStart_toEndOf="@id/risk_indicator"
-            app:layout_constraintTop_toTopOf="parent" />
+    </com.google.android.material.card.MaterialCardView>
 
-        <!-- Time -->
-        <TextView
-            android:id="@+id/text_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Message preview -->
-        <TextView
-            android:id="@+id/text_preview"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/risk_indicator"
-            app:layout_constraintTop_toBottomOf="@id/text_sender" />
+    <!-- Sender -->
+    <TextView
+        android:id="@+id/text_sender"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="22dp"
+        android:layout_marginEnd="12dp"
+        android:fontFamily="@font/dm_sans_medium"
+        android:maxLines="1"
+        android:text="Unknown Sender"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toStartOf="@id/text_time"
+        app:layout_constraintStart_toEndOf="@id/card_indicator"
+        app:layout_constraintTop_toTopOf="@id/card_indicator" />
 
-        <!-- Risk badge -->
-        <TextView
-            android:id="@+id/text_risk_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="2dp"
-            android:textColor="@color/white"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            app:layout_constraintStart_toStartOf="@id/text_preview"
-            app:layout_constraintTop_toBottomOf="@id/text_preview" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- Time -->
+    <TextView
+        android:id="@+id/text_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/dm_sans_regular"
+        android:text="06:28"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        app:layout_constraintBaseline_toBaselineOf="@id/text_sender"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-</androidx.cardview.widget.CardView>
+
+    <!-- Message preview -->
+    <TextView
+        android:id="@+id/text_preview"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/dm_sans_regular"
+        android:maxLines="1"
+        android:text="Message preview..."
+        android:textColor="@color/text_secondary"
+        android:textSize="15sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/text_sender"
+        app:layout_constraintTop_toBottomOf="@id/text_sender" />
+
+
+    <!-- Risk badge -->
+    <!-- Required by MessageListAdapter -->
+    <TextView
+        android:id="@+id/text_risk_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:background="@color/color_scam"
+        android:fontFamily="@font/dm_sans_medium"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="2dp"
+        android:text="SCAM"
+        android:textColor="@color/white"
+        android:textSize="10sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/text_sender"
+        app:layout_constraintTop_toBottomOf="@id/text_preview" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

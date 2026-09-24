@@ -1,42 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:paddingStart="24dp"
+    android:paddingTop="20dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="20dp">
 
+    <!-- Reason label -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Reason for reporting:"
-        android:textColor="#212121"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:fontFamily="@font/dm_sans_bold"
+        android:text="Reason for reporting"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
 
+    <!-- Reason dropdown -->
     <Spinner
         android:id="@+id/spinner_report_type"
         android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_report_input"
+        android:fontFamily="@font/dm_sans_regular"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:popupBackground="@color/surface" />
+
+    <!-- Additional remarks -->
+    <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginTop="26dp"
+        android:fontFamily="@font/dm_sans_bold"
+        android:text="Additional remarks"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Additional remarks (optional):"
-        android:textColor="#212121"
-        android:textSize="14sp" />
+        android:layout_marginTop="2dp"
+        android:fontFamily="@font/dm_sans_regular"
+        android:text="Optional"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
 
+    <!-- Remarks -->
     <EditText
         android:id="@+id/input_remarks"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="130dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_report_input"
+        android:fontFamily="@font/dm_sans_regular"
+        android:gravity="top|start"
         android:hint="Describe what made this message suspicious..."
-        android:inputType="textMultiLine"
-        android:lines="3"
+        android:inputType="textCapSentences|textMultiLine"
         android:maxLines="5"
-        android:gravity="top" />
+        android:padding="16dp"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:orientation="vertical">
+
+        <!-- Submit -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_submit_report"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:singleLine="true"
+            android:text="Submit Report"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            app:backgroundTint="@color/primary"
+            app:cornerRadius="27dp" />
+
+        <!-- Cancel -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_cancel_report"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Cancel"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            app:backgroundTint="#E8E8E8"
+            app:cornerRadius="27dp" />
+
+
+    </LinearLayout>
 
 </LinearLayout>
