@@ -81,59 +81,58 @@ class SmsController(private val context: Context) {
             Log.d(TAG, "Saved ${messageKeywords.size} keyword matches.")
         }
 
-        // ── Stage 2: Gemma Contextual Validator ──────────────
-        if (thresholdEvaluator.shouldInvokeGemma(riskScore)) {
-            Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
+        // ── Stage 2: Gemma Contextual Validator (always runs) ────
+        Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
 
-            val gemmaResult = gemmaValidator.validate(
-                messageBody = messageBody,
-                matchedKeywords = matchedKeywords.map { it.pattern }
-            )
+        val gemmaResult = gemmaValidator.validate(
+            messageBody = messageBody,
+            matchedKeywords = matchedKeywords.map { it.pattern }
+        )
 
-            Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
+        Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
 
-            // ── Update Message with Gemma Output ─────────────
-            val finalClassification = gemmaResult.classification
-            val isScam = finalClassification == Constants.GEMMA_SCAM
+        val finalClassification: String
+        val isScam: Boolean
 
-            val updatedMessage = message.copy(
-                messageId = messageId,
-                gemmaInvoked = true,
-                gemmaClassification = gemmaResult.classification,
-                gemmaConfidence = gemmaResult.confidence,
-                gemmaRationale = gemmaResult.rationale,
-                // If Gemma says LEGITIMATE, override flag to false
-                isFlagged = isScam,
-                riskLevel = if (isScam) RiskLevel.SCAM.name else RiskLevel.SAFE.name
-            )
-
-            messageRepository.updateMessage(updatedMessage)
-            Log.d(TAG, "Message updated with Gemma output.")
-
-            // ── Build Final Detection Result ──────────────────
-            val detectionResult = DetectionResult(
-                messageContent = messageBody,
-                riskScore = riskScore,
-                riskLevel = riskLevel,
-                isFlagged = isScam,
-                matchedKeywords = matchedKeywords,
-                gemmaInvoked = true,
-                gemmaResult = gemmaResult,
-                finalClassification = finalClassification,
-                finalRationale = gemmaResult.rationale
-            )
-
-            // ── Notify UI if Scam ─────────────────────────────
-            if (isScam) {
-                Log.d(TAG, "SCAM detected. Triggering alert notification.")
-                triggerScamAlert(context, detectionResult, messageId)
-            } else {
-                Log.d(TAG, "Gemma reclassified as LEGITIMATE. No alert shown.")
-            }
-
+        if (gemmaResult.isSuccessful) {
+            finalClassification = gemmaResult.classification
+            isScam = finalClassification == Constants.GEMMA_SCAM
         } else {
-            // Safe path — Gemma not invoked
-            Log.d(TAG, "Message is SAFE. No Gemma invocation needed.")
+            Log.w(TAG, "Gemma fallback triggered — retaining keyword-stage risk level: $riskLevel")
+            finalClassification = if (riskLevel == RiskLevel.SAFE) Constants.GEMMA_LEGITIMATE else Constants.GEMMA_SCAM
+            isScam = riskLevel != RiskLevel.SAFE
+        }
+
+        val updatedMessage = message.copy(
+            messageId = messageId,
+            gemmaInvoked = true,
+            gemmaClassification = gemmaResult.classification,
+            gemmaConfidence = gemmaResult.confidence,
+            gemmaRationale = gemmaResult.rationale,
+            isFlagged = isScam,
+            riskLevel = if (isScam) RiskLevel.SCAM.name else RiskLevel.SAFE.name
+        )
+
+        messageRepository.updateMessage(updatedMessage)
+        Log.d(TAG, "Message updated with Gemma output.")
+
+        val detectionResult = DetectionResult(
+            messageContent = messageBody,
+            riskScore = riskScore,
+            riskLevel = riskLevel,
+            isFlagged = isScam,
+            matchedKeywords = matchedKeywords,
+            gemmaInvoked = true,
+            gemmaResult = gemmaResult,
+            finalClassification = finalClassification,
+            finalRationale = gemmaResult.rationale
+        )
+
+        if (isScam) {
+            Log.d(TAG, "SCAM detected. Triggering alert notification.")
+            triggerScamAlert(context, detectionResult, messageId)
+        } else {
+            Log.d(TAG, "Message classified as SAFE by keyword + Gemma analysis.")
         }
     }
 
