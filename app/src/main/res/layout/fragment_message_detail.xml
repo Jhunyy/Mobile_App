@@ -1,82 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:fillViewport="true"
+    android:clipToPadding="false">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="32dp">
 
-        <!-- Risk status card -->
-        <androidx.cardview.widget.CardView
+        <!-- ======================== -->
+        <!-- HEADER -->
+        <!-- ======================== -->
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:layout_marginBottom="18dp">
+
+            <!-- Back button -->
+            <ImageView
+                android:id="@+id/btn_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="Back"
+                android:padding="8dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/text_primary"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/text_detail_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/dm_sans_bold"
+                android:text="Message Details"
+                android:textColor="@color/text_primary"
+                android:textSize="26sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+        <!-- ======================== -->
+        <!-- RISK STATUS -->
+        <!-- ======================== -->
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_risk_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="2dp"
+            app:strokeColor="#E9E9E9"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:paddingStart="20dp"
+                android:paddingTop="24dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="24dp">
 
                 <TextView
                     android:id="@+id/text_risk_status"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="@font/dm_sans_bold"
                     android:text="SAFE"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/color_safe"
+                    android:textSize="24sp" />
 
                 <TextView
                     android:id="@+id/text_risk_score"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="@font/dm_sans_regular"
                     android:text="Risk Score: 0"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Gemma analysis card -->
-        <androidx.cardview.widget.CardView
+        </com.google.android.material.card.MaterialCardView>
+
+
+        <!-- ======================== -->
+        <!-- AI ANALYSIS -->
+        <!-- ======================== -->
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_gemma_analysis"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="14dp"
             android:visibility="gone"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
+            app:cardBackgroundColor="@color/color_suspicious_bg"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#F2DDC7"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="20dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="@font/dm_sans_bold"
                     android:text="AI Analysis"
-                    android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/color_suspicious"
+                    android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/text_gemma_rationale"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:lineSpacingExtra="3dp"
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
 
@@ -84,77 +150,102 @@
                     android:id="@+id/text_gemma_confidence"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/dm_sans_medium"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Message content card -->
-        <androidx.cardview.widget.CardView
+        </com.google.android.material.card.MaterialCardView>
+
+
+        <!-- ======================== -->
+        <!-- MESSAGE CONTENT -->
+        <!-- ======================== -->
+
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
+            android:layout_marginBottom="22dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="2dp"
+            app:strokeColor="#E9E9E9"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="20dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="@font/dm_sans_bold"
                     android:text="Message Content"
                     android:textColor="@color/primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/text_message_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:lineSpacingExtra="4dp"
+                    android:text="Message content will appear here."
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="16sp" />
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Action buttons -->
-        <LinearLayout
+        </com.google.android.material.card.MaterialCardView>
+
+
+        <!-- ======================== -->
+        <!-- ACTION BUTTONS -->
+        <!-- ======================== -->
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_report"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Report"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            app:backgroundTint="@color/color_scam"
+            app:cornerRadius="28dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_delete"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
             android:layout_marginTop="8dp"
-            android:orientation="vertical">
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Delete"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            app:backgroundTint="@color/button_dark"
+            app:cornerRadius="28dp" />
 
-            <Button
-                android:id="@+id/btn_report"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:backgroundTint="@color/color_scam"
-                android:text="Report Message"
-                android:textColor="@color/white" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_ignore"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Ignore"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            app:backgroundTint="#E4E4E4"
+            app:cornerRadius="28dp" />
 
-            <Button
-                android:id="@+id/btn_delete"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="Delete Message" />
-
-            <Button
-                android:id="@+id/btn_ignore"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Ignore" />
-
-        </LinearLayout>
     </LinearLayout>
+
 </androidx.core.widget.NestedScrollView>
