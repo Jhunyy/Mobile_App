@@ -91,7 +91,20 @@ class SmsController internal constructor(
         }
 
         // ── Stage 2: Gemma Contextual Validator ──────────────
+        // ── Stage 2: Gemma Contextual Validator ──────────────
         Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
+
+// Save immediately that Gemma has been invoked.
+// This ensures the UI knows contextual analysis was attempted
+// even if the native inference engine crashes or becomes unavailable.
+        val gemmaAttemptedMessage = message.copy(
+            messageId = messageId,
+            gemmaInvoked = true
+        )
+
+        messageRepository.updateMessage(gemmaAttemptedMessage)
+
+        Log.d(TAG, "Gemma invocation status saved.")
 
         val gemmaResult = validateWithGemma(
             messageBody,

@@ -105,9 +105,7 @@ class MessageDetailFragment : Fragment() {
                 messageRepository.getMessageById(messageId)
 
             message?.let {
-
                 currentMessage = it
-
                 displayMessage(it)
             }
         }
@@ -120,10 +118,16 @@ class MessageDetailFragment : Fragment() {
 
         binding.apply {
 
+            // ---------------------------------
             // Message content
+            // ---------------------------------
+
             textMessageContent.text = message.content
 
+            // ---------------------------------
             // Risk status
+            // ---------------------------------
+
             textRiskStatus.text = message.riskLevel
 
             textRiskScore.text =
@@ -170,30 +174,43 @@ class MessageDetailFragment : Fragment() {
             textRiskStatus.setTextColor(statusColor)
 
             // ---------------------------------
-            // Gemma AI analysis
+            // Gemma AI Analysis
             // ---------------------------------
 
-            if (
-                message.gemmaInvoked &&
-                !message.gemmaRationale.isNullOrEmpty()
-            ) {
+            if (message.gemmaInvoked) {
 
-                cardGemmaAnalysis.visibility =
-                    View.VISIBLE
+                // Gemma was attempted, so show the card
+                cardGemmaAnalysis.visibility = View.VISIBLE
 
-                textGemmaRationale.text =
-                    message.gemmaRationale
+                if (!message.gemmaRationale.isNullOrEmpty()) {
 
-                textGemmaConfidence.text =
-                    "Confidence: ${
-                        message.gemmaConfidence ?: "N/A"
-                    }"
+                    // Gemma successfully returned an explanation
+                    textGemmaRationale.text =
+                        message.gemmaRationale
+
+                    textGemmaConfidence.text =
+                        "Confidence: ${message.gemmaConfidence ?: "N/A"}"
+
+                } else {
+
+                    // Gemma was invoked but inference was unavailable
+                    textGemmaRationale.text =
+                        "Contextual analysis was unavailable.\n" +
+                                "Classification based on keyword scoring only."
+
+                    textGemmaConfidence.text =
+                        "Confidence: ${message.gemmaConfidence ?: "LOW"}"
+                }
 
             } else {
 
-                cardGemmaAnalysis.visibility =
-                    View.GONE
+                // Gemma was never invoked for this message
+                cardGemmaAnalysis.visibility = View.GONE
             }
+
+            // ---------------------------------
+            // Report button
+            // ---------------------------------
 
             // Report is only available for flagged messages
             btnReport.visibility =
@@ -219,7 +236,6 @@ class MessageDetailFragment : Fragment() {
             btnReport.setOnClickListener {
 
                 currentMessage?.let { message ->
-
                     showReportDialog(message)
                 }
             }
@@ -254,7 +270,6 @@ class MessageDetailFragment : Fragment() {
             // ----------------------------
 
             btnIgnore.setOnClickListener {
-
                 findNavController().navigateUp()
             }
         }

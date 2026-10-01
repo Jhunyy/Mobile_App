@@ -144,10 +144,14 @@ class GemmaValidator(private val context: Context) {
 
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
-                .setMaxTokens(Constants.GEMMA_MAX_TOKENS)
-                //.setTemperature(Constants.GEMMA_TEMPERATURE)
-                //.setTopK(40)
-                //.setRandomSeed(42)
+
+                // Keep the response small for SMS classification.
+                // We do not need hundreds of generated tokens.
+                .setMaxTokens(128)
+
+                // CPU is generally the safer compatibility test on different Android GPUs.
+                .setPreferredBackend(LlmInference.Backend.CPU)
+
                 .build()
 
             llmInference = LlmInference.createFromOptions(context, options)
