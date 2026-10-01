@@ -4,7 +4,7 @@ object PromptBuilder {
 
     /**
      * Builds a structured prompt for Gemma to classify
-     * a flagged SMS message as SCAM or LEGITIMATE.
+     * an SMS message as SCAM or LEGITIMATE.
      *
      * The prompt includes:
      * - System instruction defining Gemma's role
@@ -39,7 +39,8 @@ SMS Message:
 Keywords already detected by the keyword engine:
 [$keywordList]
 
-These detected keywords indicate potential scam patterns.
+Detected keywords, if any, indicate potential scam patterns.
+A message with no keyword matches still needs a full contextual analysis.
 Use them as context but evaluate the full message meaning.
 
 Respond ONLY in this exact format with no additional text:

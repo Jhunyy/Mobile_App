@@ -9,25 +9,39 @@ import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.model.data.DetectionResult
+import com.apcida.smishingdetector.model.data.GemmaResult
 import com.apcida.smishingdetector.model.data.RiskLevel
+import com.apcida.smishingdetector.model.entity.Keyword
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.MessageKeyword
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.HashUtil
 import com.apcida.smishingdetector.util.NotificationHelper
 
-class SmsController(private val context: Context) {
+class SmsController internal constructor(
+    private val messageRepository: MessageRepository,
+    private val analyzeKeywords: suspend (String) -> List<Keyword>,
+    private val saveKeywordMatches: suspend (List<MessageKeyword>) -> Unit,
+    private val validateWithGemma: suspend (String, List<String>) -> GemmaResult,
+    private val notifyScam: (DetectionResult, Long) -> Unit
+) {
+
+    constructor(context: Context) : this(
+        messageRepository = MessageRepository(AppDatabase.getInstance(context).messageDao()),
+        analyzeKeywords = KeywordEngine(AppDatabase.getInstance(context).keywordDao())::analyze,
+        saveKeywordMatches = AppDatabase.getInstance(context).messageKeywordDao()::insertAllMessageKeywords,
+        validateWithGemma = GemmaManager.getValidator(context)::validate,
+        notifyScam = { result, messageId ->
+            NotificationHelper.showScamAlert(context.applicationContext, result, messageId)
+        }
+    )
 
     companion object {
         private const val TAG = "SmsController"
     }
 
-    private val database = AppDatabase.getInstance(context)
-    private val messageRepository = MessageRepository(database.messageDao())
-    private val keywordEngine = KeywordEngine(database.keywordDao())
     private val riskScorer = RiskScorer()
     private val thresholdEvaluator = ThresholdEvaluator()
-    private val gemmaValidator = GemmaManager.getValidator(context)
 
     /**
      * Entry point called by SmsReceiver when a new SMS arrives.
@@ -36,17 +50,12 @@ class SmsController(private val context: Context) {
     suspend fun onSmsReceived(sender: String, messageBody: String) {
         Log.d(TAG, "Processing new SMS from: $sender")
 
-        // ── Duplicate Check ───────────────────────────────────
+        // Each received SMS is analyzed, even when its text repeats an earlier message.
         val contentHash = HashUtil.hashContent(messageBody)
-        val existing = messageRepository.getMessageByHash(contentHash)
-        if (existing != null) {
-            Log.d(TAG, "Duplicate message detected. Skipping.")
-            return
-        }
 
         // ── Stage 1: Keyword Engine ───────────────────────────
         Log.d(TAG, "Stage 1: Running keyword engine...")
-        val matchedKeywords = keywordEngine.analyze(messageBody)
+        val matchedKeywords = analyzeKeywords(messageBody)
         val riskScore = riskScorer.compute(matchedKeywords)
         val riskLevel = thresholdEvaluator.evaluate(riskScore)
         val isFlagged = riskLevel != RiskLevel.SAFE
@@ -77,76 +86,62 @@ class SmsController(private val context: Context) {
                     matchedText = keyword.pattern
                 )
             }
-            database.messageKeywordDao().insertAllMessageKeywords(messageKeywords)
+            saveKeywordMatches(messageKeywords)
             Log.d(TAG, "Saved ${messageKeywords.size} keyword matches.")
         }
 
         // ── Stage 2: Gemma Contextual Validator ──────────────
-        if (thresholdEvaluator.shouldInvokeGemma(riskScore)) {
-            Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
+        Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
 
-            val gemmaResult = gemmaValidator.validate(
-                messageBody = messageBody,
-                matchedKeywords = matchedKeywords.map { it.pattern }
-            )
+        val gemmaResult = validateWithGemma(
+            messageBody,
+            matchedKeywords.map { it.pattern }
+        )
 
-            Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
+        Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
 
-            // ── Update Message with Gemma Output ─────────────
-            val finalClassification = gemmaResult.classification
-            val isScam = finalClassification == Constants.GEMMA_SCAM
-
-            val updatedMessage = message.copy(
-                messageId = messageId,
-                gemmaInvoked = true,
-                gemmaClassification = gemmaResult.classification,
-                gemmaConfidence = gemmaResult.confidence,
-                gemmaRationale = gemmaResult.rationale,
-                // If Gemma says LEGITIMATE, override flag to false
-                isFlagged = isScam,
-                riskLevel = if (isScam) RiskLevel.SCAM.name else RiskLevel.SAFE.name
-            )
-
-            messageRepository.updateMessage(updatedMessage)
-            Log.d(TAG, "Message updated with Gemma output.")
-
-            // ── Build Final Detection Result ──────────────────
-            val detectionResult = DetectionResult(
-                messageContent = messageBody,
-                riskScore = riskScore,
-                riskLevel = riskLevel,
-                isFlagged = isScam,
-                matchedKeywords = matchedKeywords,
-                gemmaInvoked = true,
-                gemmaResult = gemmaResult,
-                finalClassification = finalClassification,
-                finalRationale = gemmaResult.rationale
-            )
-
-            // ── Notify UI if Scam ─────────────────────────────
-            if (isScam) {
-                Log.d(TAG, "SCAM detected. Triggering alert notification.")
-                triggerScamAlert(context, detectionResult, messageId)
-            } else {
-                Log.d(TAG, "Gemma reclassified as LEGITIMATE. No alert shown.")
-            }
-
-        } else {
-            // Safe path — Gemma not invoked
-            Log.d(TAG, "Message is SAFE. No Gemma invocation needed.")
+        // ── Update Message with Gemma Output ─────────────
+        val finalClassification = gemmaResult.classification
+        val finalRiskLevel = when {
+            gemmaResult.isSuccessful && finalClassification == Constants.GEMMA_SCAM -> RiskLevel.SCAM
+            gemmaResult.isSuccessful && finalClassification == Constants.GEMMA_LEGITIMATE -> RiskLevel.SAFE
+            else -> riskLevel
         }
-    }
+        val finalIsFlagged = finalRiskLevel != RiskLevel.SAFE
 
-    /**
-     * Triggers a system notification alerting the user of a detected scam.
-     */
-    private fun triggerScamAlert(
-        context: Context,
-        result: DetectionResult,
-        messageId: Long
-    ) {
-        NotificationHelper.showScamAlert(context, result, messageId)
-        Log.d(TAG, "Alert triggered for message ID: $messageId")
-        Log.d(TAG, "Rationale: ${result.finalRationale}")
+        val updatedMessage = message.copy(
+            messageId = messageId,
+            gemmaInvoked = true,
+            gemmaClassification = gemmaResult.classification,
+            gemmaConfidence = gemmaResult.confidence,
+            gemmaRationale = gemmaResult.rationale,
+            // Preserve keyword risk if Gemma is unavailable or uncertain.
+            isFlagged = finalIsFlagged,
+            riskLevel = finalRiskLevel.name
+        )
+
+        messageRepository.updateMessage(updatedMessage)
+        Log.d(TAG, "Message updated with Gemma output.")
+
+        // ── Build Final Detection Result ──────────────────
+        val detectionResult = DetectionResult(
+            messageContent = messageBody,
+            riskScore = riskScore,
+            riskLevel = riskLevel,
+            isFlagged = finalIsFlagged,
+            matchedKeywords = matchedKeywords,
+            gemmaInvoked = true,
+            gemmaResult = gemmaResult,
+            finalClassification = finalClassification,
+            finalRationale = gemmaResult.rationale
+        )
+
+        // ── Notify UI if Scam ─────────────────────────────
+        if (finalRiskLevel == RiskLevel.SCAM) {
+            Log.d(TAG, "SCAM detected. Triggering alert notification.")
+            notifyScam(detectionResult, messageId)
+        } else {
+            Log.d(TAG, "Final risk level: $finalRiskLevel. No scam alert shown.")
+        }
     }
 }

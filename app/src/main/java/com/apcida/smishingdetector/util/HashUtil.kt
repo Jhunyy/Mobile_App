@@ -28,7 +28,7 @@ object HashUtil {
 
     /**
      * Generates a hash of the message content.
-     * Used to detect and skip duplicate incoming messages.
+     * Identifies repeated content without skipping analysis of incoming messages.
      */
     fun hashContent(content: String): String {
         return sha256(content.trim())

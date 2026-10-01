@@ -1,6 +1,6 @@
 # KA-SDS App Guide
 
-Keyword-Augmented Smishing Detection System (KA-SDS) is an Android app for detecting SMS phishing messages. The project uses a two-stage detection design: a fast local keyword/risk filter first, then an on-device Gemma validation step for messages that cross the risk threshold.
+Keyword-Augmented Smishing Detection System (KA-SDS) is an Android app for detecting SMS phishing messages. The project uses a two-stage detection design: local keyword/risk analysis first, then on-device Gemma validation for every received message.
 
 Team: Jhunren Apiag, Gio Patrick Cimeni, Edison Dasok  
 Institution: MSU-IIT, BS Information Technology  
@@ -9,7 +9,7 @@ Target completion: December 2026
 
 ## What The App Does
 
-KA-SDS listens for incoming SMS messages, checks the content against a local keyword database, computes a risk score, and saves the result in a Room database. If the message is risky enough, the app asks an on-device Gemma model to classify the message with more context.
+KA-SDS listens for incoming SMS messages, checks the content against a local keyword database, computes a risk score, and saves the result in a Room database. For every message, the app asks an on-device Gemma model to classify the message with more context.
 
 Main user-facing areas:
 
@@ -33,9 +33,7 @@ SmsController
     v
 KeywordEngine -> RiskScorer -> ThresholdEvaluator
     |
-    +-- below threshold: save as SAFE
-    |
-    +-- at/above threshold:
+    +-- every message, regardless of score:
             |
             v
         GemmaValidator
@@ -47,13 +45,13 @@ KeywordEngine -> RiskScorer -> ThresholdEvaluator
         update saved Message result
 ```
 
-Current threshold:
+Stage 1 risk reference:
 
 ```kotlin
 const val RISK_THRESHOLD = 60f
 ```
 
-Messages with a risk score greater than or equal to this threshold trigger Gemma validation.
+Every message proceeds to Gemma, including messages with no keyword matches and repeated content. The keyword score is only a preliminary risk assessment. Gemma loads on demand, serializes inference, and preserves keyword risk when contextual analysis is unavailable.
 
 ## Current Architecture
 
@@ -101,10 +99,10 @@ app/src/main/java/com/apcida/smishingdetector/
 | `AndroidManifest.xml` | Declares SMS, internet, and network permissions; registers `SmsReceiver`; launches `MainActivity`. |
 | `MainActivity.kt` | Sets up navigation, seeds local data, loads Gemma, uploads pending reports, and requests SMS permissions. |
 | `SmsReceiver.kt` | Receives SMS broadcasts, combines multipart messages, and passes them to `SmsController`. |
-| `SmsController.kt` | Runs duplicate checks, keyword matching, scoring, Gemma validation, and message persistence. |
+| `SmsController.kt` | Runs keyword matching, scoring, Gemma validation for every message, and message persistence. |
 | `KeywordEngine.kt` | Loads active keywords from Room and performs case-insensitive pattern matching. |
 | `RiskScorer.kt` | Computes the total risk score from matched keyword weights. |
-| `ThresholdEvaluator.kt` | Maps score to risk level and decides whether Gemma should run. |
+| `ThresholdEvaluator.kt` | Maps score to preliminary risk level; does not gate Gemma. |
 | `GemmaValidator.kt` | Loads the `.task` model, runs MediaPipe inference, and falls back safely if unavailable. |
 | `PromptBuilder.kt` | Builds the structured LLM prompt from SMS content and matched keywords. |
 | `GemmaOutputParser.kt` | Parses Gemma output into classification, confidence, and rationale. |
@@ -221,7 +219,7 @@ Planned retry improvement:
 
 ## What I Like About This Project
 
-- The two-stage design is practical: keyword filtering keeps the app fast, while Gemma is reserved for higher-risk messages.
+- The two-stage design provides keyword context to Gemma, which analyzes every incoming message.
 - The privacy story is strong because SMS detection happens locally and report uploads avoid sending raw SMS content.
 - The Room entity split is clean enough for thesis documentation and future evaluation: messages, keywords, matched indicators, reports, and safety tips are separate.
 - The Gemma integration has a safe fallback path, so detection can still continue even when the model is missing or unsupported.

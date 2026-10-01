@@ -3,7 +3,7 @@ package com.apcida.smishingdetector.util
 object Constants {
 
     // ── Detection Threshold ──────────────────────────────────────
-    // Messages with risk score >= this value trigger Stage 2 Gemma
+    // Reference threshold for Stage 1 risk reporting; never gates Gemma
     // Calibrate this during testing — start at 60
     const val RISK_THRESHOLD = 60f
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface MessageDao {
 
-    // Insert a new message — ignore if duplicate content_hash exists
+    // Insert a new received message; repeated content is allowed
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMessage(message: Message): Long
 

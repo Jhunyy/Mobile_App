@@ -13,17 +13,17 @@ class ThresholdEvaluator {
         // These can be adjusted during testing/calibration
         private const val SAFE_MAX = 29f           // 0 - 29 = SAFE
         private const val SUSPICIOUS_MAX = 59f     // 30 - 59 = SUSPICIOUS
-        // 60+ = SCAM (triggers Gemma Stage 2)
+        // 60+ = SCAM (preliminary keyword risk)
     }
 
     /**
      * Evaluates the risk score and returns the appropriate RiskLevel.
      *
-     * SAFE       — score below 30 — no Gemma invocation
-     * SUSPICIOUS — score 30 to 59 — Gemma invoked for validation
-     * SCAM       — score 60 and above — Gemma invoked for validation
+     * SAFE       — score below 30
+     * SUSPICIOUS — score 30 to 59
+     * SCAM       — score 60 and above
      *
-     * Both SUSPICIOUS and SCAM trigger Stage 2 Gemma validation.
+     * Every message proceeds to Stage 2 Gemma validation, regardless of score.
      * Final classification is determined by Gemma's output.
      */
     fun evaluate(score: Float): RiskLevel {
@@ -35,14 +35,6 @@ class ThresholdEvaluator {
 
         Log.d(TAG, "Score: $score | Threshold: ${Constants.RISK_THRESHOLD} | Level: $level")
         return level
-    }
-
-    /**
-     * Returns true if the score is high enough to trigger
-     * Stage 2 Gemma contextual validation.
-     */
-    fun shouldInvokeGemma(score: Float): Boolean {
-        return score >= Constants.RISK_THRESHOLD
     }
 
     /**

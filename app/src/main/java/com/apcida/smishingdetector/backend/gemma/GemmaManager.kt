@@ -22,7 +22,7 @@ object GemmaManager {
     fun release() {
         synchronized(this) {
             validator?.release()
-            validator = null
+            // Keep the shared validator so existing SMS controllers use the same model lock.
         }
     }
 }
