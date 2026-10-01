@@ -67,8 +67,11 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // MediaPipe LLM Inference (Gemma)
+// MediaPipe LLM Inference - temporary, kept during migration
     implementation(libs.mediapipe.tasks.genai)
+
+// LiteRT-LM
+    implementation(libs.litertlm.android)
 
     // Networking
     implementation(libs.retrofit)
