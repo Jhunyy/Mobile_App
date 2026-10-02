@@ -44,11 +44,15 @@ object GemmaOutputParser {
                         classification = line
                             .substringAfter(":")
                             .trim()
+                            .trim('[', ']', '*', '`')
+                            .trim()
                             .uppercase()
                     }
                     lowercaseLine.startsWith(PREFIX_CONFIDENCE) -> {
                         confidence = line
                             .substringAfter(":")
+                            .trim()
+                            .trim('[', ']', '*', '`')
                             .trim()
                             .uppercase()
                     }

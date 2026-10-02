@@ -125,9 +125,11 @@ class MainActivity : AppCompatActivity() {
     private fun loadGemmaModel() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                GemmaManager.loadModel(applicationContext)
-
-                Log.d(TAG, "Gemma model loaded.")
+                if (GemmaManager.loadModel(applicationContext)) {
+                    Log.d(TAG, "Gemma model loaded.")
+                } else {
+                    Log.w(TAG, "Gemma model unavailable; check GemmaValidator logs.")
+                }
             } catch (e: Exception) {
                 Log.e(
                     TAG,

@@ -117,11 +117,15 @@ implementation "androidx.navigation:navigation-ui-ktx:2.7.6"
 ```
 
 ### Gemma Model
-This project uses **Gemma 3 1B IT (INT4)**. Push the `.task` model file to a physical device via ADB rather than bundling it in `assets/`:
+This project uses **Gemma 3 1B IT (INT4)**. Download a MediaPipe-compatible `.task` model, then copy it to the test device instead of bundling it in `assets/`:
 
 ```bash
+adb shell mkdir -p /data/local/tmp/llm
 adb push gemma3-1b-it-int4.task /data/local/tmp/llm/
+adb shell ls -lh /data/local/tmp/llm/gemma3-1b-it-int4.task
 ```
+
+The file name must match `gemma3-1b-it-int4.task`. Gemma is best tested on a physical device; Android emulators are not reliably supported by MediaPipe. To diagnose a fallback result, check Logcat for `GemmaValidator` and confirm that the model is readable at the path above. MediaPipe's `maxTokens` covers the prompt **and** the response, so the app reserves a 1024-token context for SMS analysis.
 
 The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 ```

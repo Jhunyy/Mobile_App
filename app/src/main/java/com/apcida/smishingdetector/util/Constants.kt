@@ -50,7 +50,7 @@ object Constants {
 
     // ── Gemma Model ──────────────────────────────────────────────
     const val GEMMA_MODEL_PATH = "gemma/gemma3-1b-it-int4.task"
-    const val GEMMA_MAX_TOKENS = 200
+    const val GEMMA_MAX_TOKENS = 1024
     //const val GEMMA_TEMPERATURE = 0.1f  // low = more deterministic output
 
     // ── Database ─────────────────────────────────────────────────

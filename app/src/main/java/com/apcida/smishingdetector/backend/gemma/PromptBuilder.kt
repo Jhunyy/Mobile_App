@@ -33,6 +33,12 @@ Consider the following when analyzing:
 - Emotional pressure tactics (fear, reward, threats)
 - Filipino and Taglish phrasing patterns common in local scam messages
 
+Classify as SCAM only when this SMS contains concrete evidence of deception,
+an unsafe link or request, impersonation, or pressure to take a risky action.
+A routine reminder or notice without such evidence is LEGITIMATE, even if it is
+brief or does not include every detail. A scheduled time alone is not urgency.
+Do not invent facts or assume a bank, link, or request that is not in the SMS.
+
 SMS Message:
 "$messageBody"
 
@@ -43,10 +49,10 @@ Detected keywords, if any, indicate potential scam patterns.
 A message with no keyword matches still needs a full contextual analysis.
 Use them as context but evaluate the full message meaning.
 
-Respond ONLY in this exact format with no additional text:
-Classification: [SCAM or LEGITIMATE]
-Confidence: [HIGH or MEDIUM or LOW]
-Reason: [One sentence explanation in plain language]
+Respond with exactly three lines and no additional text.
+Line 1: Write "Classification: " followed by exactly one value, SCAM or LEGITIMATE.
+Line 2: Write "Confidence: " followed by exactly one value, HIGH, MEDIUM, or LOW.
+Line 3: Write "Reason: " followed by one plain-language sentence based only on this SMS.
         """.trimIndent()
     }
 }

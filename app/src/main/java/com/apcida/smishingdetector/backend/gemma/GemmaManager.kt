@@ -15,9 +15,7 @@ object GemmaManager {
         }
     }
 
-    suspend fun loadModel(context: Context) {
-        getValidator(context).loadModel()
-    }
+    suspend fun loadModel(context: Context): Boolean = getValidator(context).loadModel()
 
     fun release() {
         synchronized(this) {

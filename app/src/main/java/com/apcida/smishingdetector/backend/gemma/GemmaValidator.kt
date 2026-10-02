@@ -22,21 +22,6 @@ class GemmaValidator(private val context: Context) {
     private var isModelLoaded = false
 
     /**
-     * Detects if the app is running on an Android emulator.
-     * Gemma via MediaPipe requires a physical device.
-     */
-    private fun isEmulator(): Boolean {
-        return (android.os.Build.FINGERPRINT.startsWith("generic")
-                || android.os.Build.FINGERPRINT.startsWith("unknown")
-                || android.os.Build.MODEL.contains("google_sdk")
-                || android.os.Build.MODEL.contains("Emulator")
-                || android.os.Build.MODEL.contains("Android SDK built for x86")
-                || android.os.Build.MANUFACTURER.contains("Genymotion")
-                || android.os.Build.BRAND.startsWith("generic")
-                || android.os.Build.DEVICE.startsWith("generic"))
-    }
-
-    /**
      * Validates every SMS message using Gemma, loading the model on demand.
      *
      * Builds a structured prompt from the message and
@@ -54,7 +39,7 @@ class GemmaValidator(private val context: Context) {
             synchronized(modelLock) {
                 try {
                     loadModelLocked()
-                    if (!isModelLoaded || llmInference == null) {
+                    if (llmInference == null) {
                         Log.w(TAG, "Gemma model not loaded. Returning fallback result.")
                         return@synchronized GemmaResult.fallback()
                     }
@@ -77,7 +62,7 @@ class GemmaValidator(private val context: Context) {
                     GemmaOutputParser.parse(rawOutput)
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "Gemma inference failed: ${e.message}")
+                    Log.e(TAG, "Gemma inference failed", e)
                     GemmaResult.fallback()
                 }
             }
@@ -87,26 +72,26 @@ class GemmaValidator(private val context: Context) {
     /**
      * Returns the preferred local file path for the Gemma model.
      */
-    private fun getModelFile(): File {
-        // Primary location — internal app storage (after first copy)
+    private fun getModelFile(): File? {
+        // The model can be installed into app storage or pushed to the device with adb.
         val internalFile = File(context.filesDir, MODEL_FILE_NAME)
-        if (internalFile.exists()) return internalFile
+        if (internalFile.isFile && internalFile.canRead()) return internalFile
 
-        // Secondary location — where adb push placed the model
         val adbFile = File("/data/local/tmp/llm/$MODEL_FILE_NAME")
-        if (adbFile.exists()) return adbFile
+        if (adbFile.isFile && adbFile.canRead()) return adbFile
 
-        return internalFile
+        return null
     }
 
     /**
      * Loads the Gemma 3 1B INT4 model from internal storage or the adb push path.
      * Model loading is heavy, so this runs on the IO dispatcher.
      */
-    suspend fun loadModel() {
-        withContext(Dispatchers.IO) {
+    suspend fun loadModel(): Boolean {
+        return withContext(Dispatchers.IO) {
             synchronized(modelLock) {
                 loadModelLocked()
+                isModelLoaded
             }
         }
     }
@@ -120,34 +105,20 @@ class GemmaValidator(private val context: Context) {
                 return
             }
 
-            if (isEmulator()) {
-                Log.w(TAG, "Emulator detected. Skipping Gemma.")
-                isModelLoaded = false
-                return
-            }
-
             Log.d(TAG, "Loading Gemma model...")
             val modelFile = getModelFile()
 
-            if (!modelFile.exists()) {
-                // Try copying from adb push location
-                val adbFile = File("/data/local/tmp/llm/$MODEL_FILE_NAME")
-                if (adbFile.exists()) {
-                    Log.d(TAG, "Found model in /data/local/tmp/llm/. Copying...")
-                    copyModelFile(adbFile, modelFile)
-                } else {
-                    Log.e(TAG, "Model file not found on device.")
-                    isModelLoaded = false
-                    return
-                }
+            if (modelFile == null) {
+                Log.e(TAG, "Readable model not found. Expected $MODEL_FILE_NAME in ${context.filesDir} or /data/local/tmp/llm/")
+                isModelLoaded = false
+                return
             }
 
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
 
-                // Keep the response small for SMS classification.
-                // We do not need hundreds of generated tokens.
-                .setMaxTokens(128)
+                // MediaPipe counts prompt and response tokens together.
+                .setMaxTokens(Constants.GEMMA_MAX_TOKENS)
 
                 // CPU is generally the safer compatibility test on different Android GPUs.
                 .setPreferredBackend(LlmInference.Backend.CPU)
@@ -159,28 +130,11 @@ class GemmaValidator(private val context: Context) {
             Log.d(TAG, "Gemma model loaded successfully.")
 
         } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "MediaPipe native library not found. Requires physical device.")
+            Log.e(TAG, "MediaPipe native library could not be loaded", e)
             isModelLoaded = false
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load Gemma model: ${e.message}")
+            Log.e(TAG, "Failed to load Gemma model", e)
             isModelLoaded = false
-        }
-    }
-
-    private fun copyModelFile(source: File, destination: File) {
-        try {
-            source.inputStream().use { input ->
-                destination.outputStream().use { output ->
-                    val buffer = ByteArray(4096)
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                    }
-                }
-            }
-            Log.d(TAG, "Model copied to: ${destination.absolutePath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy model: ${e.message}")
         }
     }
 

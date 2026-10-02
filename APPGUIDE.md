@@ -130,11 +130,14 @@ Recommended development setup:
 ```bash
 adb shell mkdir -p /data/local/tmp/llm
 adb push gemma3-1b-it-int4.task /data/local/tmp/llm/
+adb shell ls -lh /data/local/tmp/llm/gemma3-1b-it-int4.task
 ```
 
 Notes:
 
-- Test Gemma on a physical Android device. The validator intentionally skips model loading on emulators.
+- Test Gemma on a physical Android device when possible. MediaPipe inference is unreliable on emulators; the validator tries to load the model and logs the actual failure.
+- If the message shows "Contextual analysis was unavailable," check `GemmaValidator` in Logcat for a missing model, unreadable file, load error, invalid output, or inference exception.
+- MediaPipe's `maxTokens` includes input and output tokens. The app uses 1024 so the SMS prompt leaves room for a response.
 - Do not commit `.task` or other large model files.
 - `setTemperature` is currently commented out because the selected MediaPipe API version does not expose it the same way as older examples.
 
