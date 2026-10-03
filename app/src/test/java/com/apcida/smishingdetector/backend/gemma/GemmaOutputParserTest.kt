@@ -1,5 +1,6 @@
 package com.apcida.smishingdetector.backend.gemma
 
+import com.apcida.smishingdetector.model.data.GemmaResult
 import com.apcida.smishingdetector.util.Constants
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -53,7 +54,7 @@ class GemmaOutputParserTest {
     }
 
     @Test
-    fun parse_defaultsUnexpectedValuesToUncertainAndLowConfidence() {
+    fun parse_rejectsUnexpectedValuesAndMissingReason() {
         val rawOutput = """
             Classification: MAYBE
             Confidence: VERY HIGH
@@ -62,12 +63,19 @@ class GemmaOutputParserTest {
 
         val result = GemmaOutputParser.parse(rawOutput)
 
+        assertFalse(result.isSuccessful)
         assertEquals(Constants.GEMMA_UNCERTAIN, result.classification)
         assertEquals(Constants.CONFIDENCE_LOW, result.confidence)
-        assertEquals(
-            "No explanation was provided by the contextual analysis.",
-            result.rationale
+        assertEquals(GemmaResult.fallback().rationale, result.rationale)
+    }
+
+    @Test
+    fun parse_acceptsExplicitUncertainty() {
+        val result = GemmaOutputParser.parse(
+            "Classification: UNCERTAIN\nConfidence: LOW\nReason: The sender cannot be verified from this text."
         )
+        assertTrue(result.isSuccessful)
+        assertEquals(Constants.GEMMA_UNCERTAIN, result.classification)
     }
 
     @Test

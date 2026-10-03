@@ -46,7 +46,7 @@ class SmsReceiver : BroadcastReceiver() {
                 val messageBody = bodyBuilder.toString().trim()
 
                 if (messageBody.isNotEmpty()) {
-                    Log.d(TAG, "New SMS received from: $sender")
+                    Log.d(TAG, "New SMS received")
                     controller.onSmsReceived(sender, messageBody)
                 }
             }

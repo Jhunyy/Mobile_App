@@ -13,19 +13,10 @@ object GemmaOutputParser {
     private const val PREFIX_CONFIDENCE = "confidence:"
     private const val PREFIX_REASON = "reason:"
 
-    /**
-     * Parses Gemma's raw text output into a structured GemmaResult.
-     *
-     * Expected format:
-     * Classification: SCAM or LEGITIMATE
-     * Confidence: HIGH or MEDIUM or LOW
-     * Reason: One sentence explanation
-     *
-     * If parsing fails, returns a fallback GemmaResult.
-     */
+    /** Invalid or incomplete output must not be treated as a successful verdict. */
     fun parse(rawOutput: String): GemmaResult {
         return try {
-            Log.d(TAG, "Parsing Gemma output: $rawOutput")
+            Log.d(TAG, "Parsing Gemma output")
 
             val lines = rawOutput
                 .trim()
@@ -64,38 +55,20 @@ object GemmaOutputParser {
                 }
             }
 
-            // Validate classification value
-            val validClassification = when (classification) {
-                Constants.GEMMA_SCAM -> Constants.GEMMA_SCAM
-                Constants.GEMMA_LEGITIMATE -> Constants.GEMMA_LEGITIMATE
-                else -> {
-                    Log.w(TAG, "Unexpected classification value: $classification. Defaulting to UNCERTAIN.")
-                    Constants.GEMMA_UNCERTAIN
-                }
+            if (classification !in setOf(Constants.GEMMA_SCAM, Constants.GEMMA_LEGITIMATE, Constants.GEMMA_UNCERTAIN) ||
+                confidence !in setOf(Constants.CONFIDENCE_HIGH, Constants.CONFIDENCE_MEDIUM, Constants.CONFIDENCE_LOW) ||
+                reason.isBlank()
+            ) {
+                Log.w(TAG, "Incomplete or invalid contextual analysis output.")
+                return GemmaResult.fallback()
             }
 
-            // Validate confidence value
-            val validConfidence = when (confidence) {
-                Constants.CONFIDENCE_HIGH -> Constants.CONFIDENCE_HIGH
-                Constants.CONFIDENCE_MEDIUM -> Constants.CONFIDENCE_MEDIUM
-                Constants.CONFIDENCE_LOW -> Constants.CONFIDENCE_LOW
-                else -> {
-                    Log.w(TAG, "Unexpected confidence value: $confidence. Defaulting to LOW.")
-                    Constants.CONFIDENCE_LOW
-                }
-            }
-
-            // Use fallback reason if empty
-            val finalReason = reason.ifEmpty {
-                "No explanation was provided by the contextual analysis."
-            }
-
-            Log.d(TAG, "Parsed — Classification: $validClassification | Confidence: $validConfidence")
+            Log.d(TAG, "Parsed — Classification: $classification | Confidence: $confidence")
 
             GemmaResult(
-                classification = validClassification,
-                confidence = validConfidence,
-                rationale = finalReason,
+                classification = classification,
+                confidence = confidence,
+                rationale = reason,
                 isSuccessful = true
             )
 
@@ -111,9 +84,9 @@ object GemmaOutputParser {
      * Useful for detecting completely malformed responses.
      */
     fun isValidFormat(rawOutput: String): Boolean {
-        val lower = rawOutput.lowercase()
-        return lower.contains(PREFIX_CLASSIFICATION) &&
-                lower.contains(PREFIX_CONFIDENCE) &&
-                lower.contains(PREFIX_REASON)
+        val lines = rawOutput.trim().lines().map { it.trim().lowercase() }
+        return lines.any { it.startsWith(PREFIX_CLASSIFICATION) } &&
+                lines.any { it.startsWith(PREFIX_CONFIDENCE) } &&
+                lines.any { it.startsWith(PREFIX_REASON) }
     }
 }

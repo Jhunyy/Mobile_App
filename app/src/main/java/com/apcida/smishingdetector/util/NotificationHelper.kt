@@ -46,10 +46,10 @@ object NotificationHelper {
         val notification = NotificationCompat.Builder(context, SCAM_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_warning)
             .setContentTitle("Potential scam SMS detected")
-            .setContentText("Risk score: ${result.riskScore.toInt()}. Tap to review details.")
+            .setContentText("Review this message before responding or opening links.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("A message was classified as scam. Review the detection result before taking action.")
+                    .bigText("This message has scam indicators. Verify through a contact method you already trust.")
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)

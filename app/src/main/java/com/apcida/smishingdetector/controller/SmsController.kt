@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.detection.KeywordEngine
+import com.apcida.smishingdetector.backend.detection.DecisionEngine
 import com.apcida.smishingdetector.backend.detection.RiskScorer
 import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
@@ -48,7 +49,7 @@ class SmsController internal constructor(
      * Runs the full two-stage detection pipeline.
      */
     suspend fun onSmsReceived(sender: String, messageBody: String) {
-        Log.d(TAG, "Processing new SMS from: $sender")
+        Log.d(TAG, "Processing new SMS")
 
         // Each received SMS is analyzed, even when its text repeats an earlier message.
         val contentHash = HashUtil.hashContent(messageBody)
@@ -91,7 +92,6 @@ class SmsController internal constructor(
         }
 
         // ── Stage 2: Gemma Contextual Validator ──────────────
-        // ── Stage 2: Gemma Contextual Validator ──────────────
         Log.d(TAG, "Stage 2: Invoking Gemma contextual validator...")
 
 // Save immediately that Gemma has been invoked.
@@ -114,12 +114,7 @@ class SmsController internal constructor(
         Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
 
         // ── Update Message with Gemma Output ─────────────
-        val finalClassification = gemmaResult.classification
-        val finalRiskLevel = when {
-            gemmaResult.isSuccessful && finalClassification == Constants.GEMMA_SCAM -> RiskLevel.SCAM
-            gemmaResult.isSuccessful && finalClassification == Constants.GEMMA_LEGITIMATE -> RiskLevel.SAFE
-            else -> riskLevel
-        }
+        val finalRiskLevel = DecisionEngine.decide(riskLevel, gemmaResult)
         val finalIsFlagged = finalRiskLevel != RiskLevel.SAFE
 
         val updatedMessage = message.copy(
@@ -140,13 +135,18 @@ class SmsController internal constructor(
         val detectionResult = DetectionResult(
             messageContent = messageBody,
             riskScore = riskScore,
-            riskLevel = riskLevel,
+            riskLevel = finalRiskLevel,
             isFlagged = finalIsFlagged,
             matchedKeywords = matchedKeywords,
             gemmaInvoked = true,
             gemmaResult = gemmaResult,
-            finalClassification = finalClassification,
-            finalRationale = gemmaResult.rationale
+            finalClassification = finalRiskLevel.name,
+            finalRationale = when {
+                finalRiskLevel == RiskLevel.SUSPICIOUS &&
+                    gemmaResult.classification == Constants.GEMMA_LEGITIMATE ->
+                    "Keyword indicators remain despite a benign contextual assessment. Verify independently."
+                else -> gemmaResult.rationale
+            }
         )
 
         // ── Notify UI if Scam ─────────────────────────────

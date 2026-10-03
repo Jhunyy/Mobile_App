@@ -30,8 +30,9 @@ class SmsControllerTest {
             assertEquals(Constants.GEMMA_LEGITIMATE, saved.gemmaClassification)
             assertEquals("Contextual result", saved.gemmaRationale)
             assertEquals(Constants.CONFIDENCE_HIGH, saved.gemmaConfidence)
-            assertEquals(RiskLevel.SAFE.name, saved.riskLevel)
-            assertFalse(saved.isFlagged)
+            val expected = if (score >= 60f) RiskLevel.SUSPICIOUS else RiskLevel.SAFE
+            assertEquals(expected.name, saved.riskLevel)
+            assertEquals(expected != RiskLevel.SAFE, saved.isFlagged)
             assertEquals(fixture.keywords.size, fixture.matches.size)
             assertTrue(fixture.matches.all { it.messageId == saved.messageId })
             assertTrue(fixture.alerts.isEmpty())
@@ -50,6 +51,17 @@ class SmsControllerTest {
         assertEquals(saved.messageId, messageId)
         assertEquals(Constants.GEMMA_SCAM, alert.finalClassification)
         assertTrue(alert.gemmaInvoked)
+    }
+
+    @Test
+    fun uncertainGemmaDoesNotMarkMessageSafe() = runBlocking {
+        val fixture = Fixture(35f, legitimate().copy(classification = Constants.GEMMA_UNCERTAIN))
+        fixture.controller.onSmsReceived("sender", "Ambiguous SMS")
+
+        val saved = fixture.dao.messages.single()
+        assertEquals(RiskLevel.SUSPICIOUS.name, saved.riskLevel)
+        assertTrue(saved.isFlagged)
+        assertTrue(fixture.alerts.isEmpty())
     }
 
     @Test

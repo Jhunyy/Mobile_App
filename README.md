@@ -22,10 +22,15 @@ Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
         Stage 2: GemmaValidator (PromptBuilder → on-device inference → GemmaOutputParser)
             │
             ▼
+        DecisionEngine (keyword risk + Gemma result)
+            │
+            ▼
         DetectionResult (SAFE / SUSPICIOUS / SCAM + rationale)
 ```
 
 Repeated message text is analyzed on each receipt. Gemma loads on demand and inference is serialized for overlapping messages. If the model is unavailable or inference fails, the keyword risk level is retained and the Gemma result records that analysis was unavailable.
+
+Keywords match complete phrases, and URL patterns are checked against parsed URL hosts. The final decision retains a SUSPICIOUS result when a high keyword score conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
 
 All SMS processing happens on-device. No raw SMS content is ever transmitted off the device — only anonymized metadata is sent when a user submits a report.
 

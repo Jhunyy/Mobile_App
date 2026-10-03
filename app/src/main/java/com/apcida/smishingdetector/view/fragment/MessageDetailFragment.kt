@@ -128,10 +128,14 @@ class MessageDetailFragment : Fragment() {
             // Risk status
             // ---------------------------------
 
-            textRiskStatus.text = message.riskLevel
+            textRiskStatus.text = when (message.riskLevel) {
+                Constants.RISK_SCAM -> "Likely scam"
+                Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
+                else -> "No scam indicators found"
+            }
 
             textRiskScore.text =
-                "Risk Score: ${message.riskScore.toInt()}"
+                "Keyword risk score: ${message.riskScore.toInt()}"
 
             // ---------------------------------
             // Risk card background
@@ -182,11 +186,18 @@ class MessageDetailFragment : Fragment() {
                 // Gemma was attempted, so show the card
                 cardGemmaAnalysis.visibility = View.VISIBLE
 
-                if (!message.gemmaRationale.isNullOrEmpty()) {
+                if (message.gemmaClassification != Constants.GEMMA_UNCERTAIN &&
+                    !message.gemmaRationale.isNullOrEmpty()) {
 
                     // Gemma successfully returned an explanation
-                    textGemmaRationale.text =
+                    textGemmaRationale.text = if (
+                        message.riskLevel == Constants.RISK_SUSPICIOUS &&
+                        message.gemmaClassification == Constants.GEMMA_LEGITIMATE
+                    ) {
+                        "Keyword indicators remain; verify independently. ${message.gemmaRationale}"
+                    } else {
                         message.gemmaRationale
+                    }
 
                     textGemmaConfidence.text =
                         "Confidence: ${message.gemmaConfidence ?: "N/A"}"
@@ -194,9 +205,11 @@ class MessageDetailFragment : Fragment() {
                 } else {
 
                     // Gemma was invoked but inference was unavailable
-                    textGemmaRationale.text =
-                        "Contextual analysis was unavailable.\n" +
-                                "Classification based on keyword scoring only."
+                    textGemmaRationale.text = if (message.gemmaConfidence == null) {
+                        "Contextual analysis was unavailable. Classification based on keyword scoring only."
+                    } else {
+                        message.gemmaRationale ?: "Contextual analysis was inconclusive."
+                    }
 
                     textGemmaConfidence.text =
                         "Confidence: ${message.gemmaConfidence ?: "LOW"}"

@@ -50,7 +50,7 @@ class GemmaValidator(private val context: Context) {
 
                     // Run inference
                     val rawOutput = llmInference!!.generateResponse(prompt)
-                    Log.d(TAG, "Gemma raw output: $rawOutput")
+                    Log.d(TAG, "Gemma inference completed")
 
                     // Validate output format
                     if (!GemmaOutputParser.isValidFormat(rawOutput)) {
