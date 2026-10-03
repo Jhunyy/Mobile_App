@@ -42,7 +42,7 @@ class SmsControllerTest {
     @Test
     fun gemmaCanDetectScamWithoutAnyKeywordMatches() = runBlocking {
         val fixture = Fixture(0f, legitimate().copy(classification = Constants.GEMMA_SCAM))
-        fixture.controller.onSmsReceived("sender", "Unrecognized scam wording")
+        fixture.controller.onSmsReceived("sender", "Please send cash now")
 
         val saved = fixture.dao.messages.single()
         assertEquals(RiskLevel.SCAM.name, saved.riskLevel)
@@ -51,6 +51,21 @@ class SmsControllerTest {
         assertEquals(saved.messageId, messageId)
         assertEquals(Constants.GEMMA_SCAM, alert.finalClassification)
         assertTrue(alert.gemmaInvoked)
+    }
+
+    @Test
+    fun lowConfidenceScamVerdictDoesNotFlagOrdinaryReminder() = runBlocking {
+        val fixture = Fixture(0f, legitimate().copy(
+            classification = Constants.GEMMA_SCAM,
+            confidence = Constants.CONFIDENCE_LOW,
+            rationale = "The reminder does not name the meeting attendees."
+        ))
+        fixture.controller.onSmsReceived("sender", "Hi! Just reminding you that our meeting is tomorrow at 10 AM. See you then.")
+
+        val saved = fixture.dao.messages.single()
+        assertEquals(RiskLevel.SAFE.name, saved.riskLevel)
+        assertFalse(saved.isFlagged)
+        assertTrue(fixture.alerts.isEmpty())
     }
 
     @Test

@@ -26,6 +26,8 @@ Include hard legitimate examples: routine OTP delivery, bank notices, delivery u
 
 Gemma's HIGH/MEDIUM/LOW field is self-reported and must not be interpreted as a measured probability. If fine-tuning is attempted, use only the training split; compare the tuned model with the original on the untouched test set and on the actual device before adopting it.
 
+Regression example: `Hi! Just reminding you that our meeting is tomorrow at 10 AM. See you then.` is SAFE when the keyword score is zero, including when Gemma gives an unsupported SCAM verdict with LOW confidence. Absence of venue or attendee names is not scam evidence. Keep this example in the fixed regression set and add varied real reminders so the system does not merely memorize one sentence.
+
 ## Known implementation limit
 
 `SmsReceiver` currently launches a coroutine after receiving a broadcast. A long model run may outlive the receiver's allowed processing window. Move long analysis into durable background work and verify receipt-to-result behavior with the app closed before claiming reliable detection of every delivered SMS.

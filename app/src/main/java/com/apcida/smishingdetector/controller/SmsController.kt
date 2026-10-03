@@ -114,7 +114,7 @@ class SmsController internal constructor(
         Log.d(TAG, "Gemma result — Classification: ${gemmaResult.classification} | Confidence: ${gemmaResult.confidence}")
 
         // ── Update Message with Gemma Output ─────────────
-        val finalRiskLevel = DecisionEngine.decide(riskLevel, gemmaResult)
+        val finalRiskLevel = DecisionEngine.decide(riskLevel, gemmaResult, messageBody)
         val finalIsFlagged = finalRiskLevel != RiskLevel.SAFE
 
         val updatedMessage = message.copy(

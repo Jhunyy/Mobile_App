@@ -190,13 +190,14 @@ class MessageDetailFragment : Fragment() {
                     !message.gemmaRationale.isNullOrEmpty()) {
 
                     // Gemma successfully returned an explanation
-                    textGemmaRationale.text = if (
+                    textGemmaRationale.text = when {
+                        message.gemmaClassification == Constants.GEMMA_SCAM &&
+                            message.riskLevel != Constants.RISK_SCAM ->
+                            "The AI suggested scam, but the available evidence did not justify a scam alert. ${message.gemmaRationale}"
                         message.riskLevel == Constants.RISK_SUSPICIOUS &&
-                        message.gemmaClassification == Constants.GEMMA_LEGITIMATE
-                    ) {
-                        "Keyword indicators remain; verify independently. ${message.gemmaRationale}"
-                    } else {
-                        message.gemmaRationale
+                            message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
+                            "Keyword indicators remain; verify independently. ${message.gemmaRationale}"
+                        else -> message.gemmaRationale
                     }
 
                     textGemmaConfidence.text =
