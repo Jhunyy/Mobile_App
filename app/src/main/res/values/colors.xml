@@ -39,4 +39,23 @@
     <!-- Overlay -->
     <color name="overlay">#70000000</color>
 
+    <!-- Message inbox -->
+    <color name="inbox_green">#00A86B</color>
+    <color name="inbox_green_soft">#DDF5E9</color>
+    <color name="inbox_text">#14151B</color>
+    <color name="inbox_muted">#777B87</color>
+    <color name="inbox_search">#F2F3F5</color>
+    <color name="inbox_chip">#F1F2F4</color>
+    <color name="inbox_card_border">#E8EAED</color>
+    <color name="inbox_unread_border">#F6D5D8</color>
+    <color name="inbox_unread_bg">#FFF8F8</color>
+    <color name="inbox_scam">#D60019</color>
+    <color name="inbox_scam_soft">#FCE5E7</color>
+    <color name="inbox_safe">#218957</color>
+    <color name="inbox_safe_soft">#E5F4E9</color>
+    <color name="inbox_suspicious">#A86508</color>
+    <color name="inbox_suspicious_soft">#FFF1D8</color>
+    <color name="inbox_pending">#346783</color>
+    <color name="inbox_pending_soft">#E8F0F6</color>
+
 </resources>

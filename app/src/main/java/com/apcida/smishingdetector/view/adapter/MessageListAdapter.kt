@@ -1,22 +1,23 @@
 package com.apcida.smishingdetector.view.adapter
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ItemMessageBinding
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.util.Constants
-import com.apcida.smishingdetector.util.DateUtil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MessageListAdapter(
-    private val onMessageClick: (Message) -> Unit
+    private val onMessageClick: (Message) -> Unit,
+    private val isUnread: (Message) -> Boolean
 ) : ListAdapter<Message, MessageListAdapter.MessageViewHolder>(MessageDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
@@ -38,6 +39,9 @@ class MessageListAdapter(
 
         fun bind(message: Message) {
             binding.apply {
+                val context = root.context
+                val unread = isUnread(message)
+                val pending = message.gemmaInvoked && message.gemmaClassification == null
 
                 // Sender — show hashed sender as placeholder
                 // since raw sender is not stored
@@ -49,31 +53,36 @@ class MessageListAdapter(
                 // Time
                 textTime.text = formatTime(message.receivedAt)
 
-                // Risk indicator dot color
-                val indicatorColor = when (message.riskLevel) {
-                    Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                    Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
-                    else -> Color.parseColor("#2E7D32")
+                val indicatorColor = when {
+                    pending -> ContextCompat.getColor(context, R.color.inbox_pending)
+                    message.riskLevel == Constants.RISK_SCAM ->
+                        ContextCompat.getColor(context, R.color.inbox_scam)
+                    message.riskLevel == Constants.RISK_SUSPICIOUS ->
+                        ContextCompat.getColor(context, R.color.inbox_suspicious)
+                    else -> ContextCompat.getColor(context, R.color.inbox_safe)
                 }
-                riskIndicator.setBackgroundColor(indicatorColor)
+                avatarCircle.setCardBackgroundColor(indicatorColor)
+                unreadDot.visibility = if (unread) View.VISIBLE else View.GONE
+                cardMessage.setCardBackgroundColor(ContextCompat.getColor(
+                    context, if (unread) R.color.inbox_unread_bg else R.color.white
+                ))
+                cardMessage.strokeColor = ContextCompat.getColor(
+                    context, if (unread) R.color.inbox_unread_border else R.color.inbox_card_border
+                )
 
-                // Risk badge
-                if (message.isFlagged) {
-                    textRiskBadge.visibility = View.VISIBLE
-                    textRiskBadge.text = message.riskLevel
-
-                    val badgeColor = when (message.riskLevel) {
-                        Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                        Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
-                        else -> Color.parseColor("#2E7D32")
-                    }
-                    textRiskBadge.setBackgroundColor(badgeColor)
-                } else {
-                    textRiskBadge.visibility = View.GONE
+                textRiskBadge.visibility = View.VISIBLE
+                textRiskBadge.text = if (pending) "ANALYZING" else message.riskLevel
+                val badgeBackground = when {
+                    pending -> R.drawable.bg_inbox_badge_pending
+                    message.riskLevel == Constants.RISK_SCAM -> R.drawable.bg_inbox_badge_scam
+                    message.riskLevel == Constants.RISK_SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
+                    else -> R.drawable.bg_inbox_badge_safe
                 }
+                textRiskBadge.setBackgroundResource(badgeBackground)
+                textRiskBadge.setTextColor(indicatorColor)
 
                 // Click listener
-                root.setOnClickListener {
+                cardMessage.setOnClickListener {
                     onMessageClick(message)
                 }
             }

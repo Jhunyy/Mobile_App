@@ -1,134 +1,217 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
-    <!-- ========================= -->
-    <!-- HEADER -->
-    <!-- ========================= -->
-
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="0dp"
-        android:layout_height="80dp"
-        android:background="@color/background"
-        android:elevation="0dp"
-        app:contentInsetEnd="0dp"
-        app:contentInsetStart="0dp"
-        app:contentInsetStartWithNavigation="0dp"
-        app:title=""
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <!-- Header icon -->
-            <ImageView
-                android:id="@+id/img_messages"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="28dp"
-                android:src="@drawable/ic_messages"
-                app:tint="@color/primary"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <!-- Header title -->
-            <TextView
-                android:id="@+id/text_messages_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/dm_sans_bold"
-                android:text="Messages"
-                android:textColor="@color/text_primary"
-                android:textSize="26sp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-    </androidx.appcompat.widget.Toolbar>
-
-
-    <!-- ========================= -->
-    <!-- EMPTY STATE -->
-    <!-- ========================= -->
-
-    <LinearLayout
-        android:id="@+id/empty_state"
-        android:layout_width="280dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="visible"
-        tools:visibility="visible"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toolbar"
-        app:layout_constraintVertical_bias="0.48">
+        android:paddingStart="20dp"
+        android:paddingTop="22dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="20dp">
 
         <ImageView
-            android:id="@+id/img_empty_messages"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:id="@+id/img_messages"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:contentDescription="@null"
             android:src="@drawable/ic_messages"
-            app:tint="@color/primary" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/text_messages_title"
+            app:tint="@color/inbox_green" />
 
         <TextView
+            android:id="@+id/text_messages_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginStart="12dp"
             android:fontFamily="@font/dm_sans_bold"
-            android:text="No messages yet"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp" />
+            android:text="Messages"
+            android:textColor="@color/inbox_text"
+            android:textSize="28sp"
+            app:layout_constraintStart_toEndOf="@id/img_messages"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
-            android:layout_width="260dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="2dp"
             android:fontFamily="@font/dm_sans_regular"
-            android:gravity="center"
-            android:lineSpacingExtra="3dp"
-            android:text="Your messages will appear here once they are detected."
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:text="Scan and identify suspicious messages"
+            android:textColor="@color/inbox_muted"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toStartOf="@id/btn_more"
+            app:layout_constraintStart_toStartOf="@id/text_messages_title"
+            app:layout_constraintTop_toBottomOf="@id/text_messages_title" />
 
+        <ImageButton
+            android:id="@+id/btn_more"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="More options"
+            android:padding="10dp"
+            android:src="@drawable/ic_more_vert"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/inbox_muted" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:background="@drawable/bg_inbox_search"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="12dp">
+
+        <ImageView
+            android:layout_width="23dp"
+            android:layout_height="23dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_search"
+            app:tint="@color/inbox_muted" />
+
+        <EditText
+            android:id="@+id/input_search"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:fontFamily="@font/dm_sans_regular"
+            android:hint="Search messages..."
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:padding="0dp"
+            android:textColor="@color/inbox_text"
+            android:textColorHint="@color/inbox_muted"
+            android:textSize="15sp" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <!-- ========================= -->
-    <!-- MESSAGE LIST -->
-    <!-- ========================= -->
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_messages"
-        android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/chip_all"
+                    style="@style/InboxFilterChip"
+                    android:background="@drawable/bg_inbox_chip_selected"
+                    android:text="All"
+                    android:textColor="@color/inbox_green" />
+
+                <TextView
+                    android:id="@+id/chip_scam"
+                    style="@style/InboxFilterChip"
+                    android:layout_marginStart="8dp"
+                    android:text="Scam" />
+
+                <TextView
+                    android:id="@+id/chip_safe"
+                    style="@style/InboxFilterChip"
+                    android:layout_marginStart="8dp"
+                    android:text="Safe" />
+
+                <TextView
+                    android:id="@+id/chip_unread"
+                    style="@style/InboxFilterChip"
+                    android:layout_marginStart="8dp"
+                    android:text="Unread" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <ImageButton
+            android:id="@+id/btn_sort"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Sort messages"
+            android:padding="9dp"
+            android:src="@drawable/ic_filter_list"
+            app:tint="@color/inbox_text" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="20dp"
-        android:clipToPadding="false"
-        android:paddingTop="8dp"
-        android:paddingBottom="24dp"
-        android:visibility="gone"
-        tools:listitem="@layout/item_message"
-        tools:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toolbar" />
+        android:layout_weight="1">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_messages"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="12dp"
+            android:scrollbars="none"
+            tools:listitem="@layout/item_message" />
+
+        <LinearLayout
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_messages"
+                app:tint="@color/inbox_green" />
+
+            <TextView
+                android:id="@+id/text_empty_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="@font/dm_sans_bold"
+                android:text="No messages yet"
+                android:textColor="@color/inbox_text"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/text_empty_description"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:fontFamily="@font/dm_sans_regular"
+                android:gravity="center"
+                android:text="Your messages will appear here once they are detected."
+                android:textColor="@color/inbox_muted"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>
