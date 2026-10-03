@@ -36,6 +36,10 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     suspend fun getMessageById(messageId: Long): Message?
 
+    // Observe a message while contextual analysis updates its saved result.
+    @Query("SELECT * FROM messages WHERE message_id = :messageId")
+    fun observeMessageById(messageId: Long): Flow<Message?>
+
     // Check for duplicate message by content hash
     @Query("SELECT * FROM messages WHERE content_hash = :hash LIMIT 1")
     suspend fun getMessageByHash(hash: String): Message?

@@ -146,6 +146,7 @@ class SmsControllerTest {
         }
         override suspend fun getMessageByHash(hash: String) = messages.find { it.contentHash == hash }
         override suspend fun getMessageById(messageId: Long) = messages.find { it.messageId == messageId }
+        override fun observeMessageById(messageId: Long): Flow<Message?> = flowOf(messages.find { it.messageId == messageId })
         override fun getAllMessages(): Flow<List<Message>> = flowOf(messages.toList())
         override fun getFlaggedMessages(): Flow<List<Message>> = flowOf(messages.filter { it.isFlagged })
         override suspend fun deleteMessage(message: Message) { messages.remove(message) }

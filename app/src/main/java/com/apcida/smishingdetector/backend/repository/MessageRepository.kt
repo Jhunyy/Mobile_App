@@ -52,6 +52,10 @@ class MessageRepository(private val messageDao: MessageDao) {
         return messageDao.getMessageById(messageId)
     }
 
+    fun observeMessageById(messageId: Long): Flow<Message?> {
+        return messageDao.observeMessageById(messageId)
+    }
+
     /**
      * Checks for a duplicate message using its content hash.
      * Returns the existing message or null if no duplicate found.

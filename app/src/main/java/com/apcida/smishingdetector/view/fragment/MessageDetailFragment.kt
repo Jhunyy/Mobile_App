@@ -18,6 +18,7 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MessageDetailFragment : Fragment() {
@@ -59,7 +60,7 @@ class MessageDetailFragment : Fragment() {
         // Get the message ID passed from MessagesFragment
         val messageId = arguments?.getLong("messageId") ?: return
 
-        loadMessage(messageId)
+        observeMessage(messageId)
     }
 
     /**
@@ -95,18 +96,14 @@ class MessageDetailFragment : Fragment() {
     }
 
     /**
-     * Load the selected message from the database.
+     * Keep the details current while Gemma updates the saved message.
      */
-    private fun loadMessage(messageId: Long) {
-
+    private fun observeMessage(messageId: Long) {
         viewLifecycleOwner.lifecycleScope.launch {
-
-            val message =
-                messageRepository.getMessageById(messageId)
-
-            message?.let {
-                currentMessage = it
-                displayMessage(it)
+            messageRepository.observeMessageById(messageId).collectLatest { message ->
+                if (message == null) return@collectLatest
+                currentMessage = message
+                displayMessage(message)
             }
         }
     }
@@ -117,6 +114,7 @@ class MessageDetailFragment : Fragment() {
     private fun displayMessage(message: Message) {
 
         binding.apply {
+            val analysisPending = message.gemmaClassification == null
 
             // ---------------------------------
             // Message content
@@ -128,9 +126,10 @@ class MessageDetailFragment : Fragment() {
             // Risk status
             // ---------------------------------
 
-            textRiskStatus.text = when (message.riskLevel) {
-                Constants.RISK_SCAM -> "Likely scam"
-                Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
+            textRiskStatus.text = when {
+                analysisPending -> "Analyzing message…"
+                message.riskLevel == Constants.RISK_SCAM -> "Likely scam"
+                message.riskLevel == Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
                 else -> "No scam indicators found"
             }
 
@@ -142,12 +141,13 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             val backgroundColor =
-                when (message.riskLevel) {
+                when {
+                    analysisPending -> Color.parseColor("#EAF0F7")
 
-                    Constants.RISK_SCAM ->
+                    message.riskLevel == Constants.RISK_SCAM ->
                         Color.parseColor("#FDECEC")
 
-                    Constants.RISK_SUSPICIOUS ->
+                    message.riskLevel == Constants.RISK_SUSPICIOUS ->
                         Color.parseColor("#FFF4E4")
 
                     else ->
@@ -163,12 +163,13 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             val statusColor =
-                when (message.riskLevel) {
+                when {
+                    analysisPending -> Color.parseColor("#34556B")
 
-                    Constants.RISK_SCAM ->
+                    message.riskLevel == Constants.RISK_SCAM ->
                         Color.parseColor("#CA433C")
 
-                    Constants.RISK_SUSPICIOUS ->
+                    message.riskLevel == Constants.RISK_SUSPICIOUS ->
                         Color.parseColor("#F2A33A")
 
                     else ->
@@ -181,10 +182,15 @@ class MessageDetailFragment : Fragment() {
             // Gemma AI Analysis
             // ---------------------------------
 
-            if (message.gemmaInvoked) {
+            if (analysisPending) {
+                cardGemmaAnalysis.visibility = View.VISIBLE
+                textGemmaRationale.text = "Analyzing this message on your device…"
+                textGemmaConfidence.visibility = View.GONE
+            } else if (message.gemmaInvoked) {
 
                 // Gemma was attempted, so show the card
                 cardGemmaAnalysis.visibility = View.VISIBLE
+                textGemmaConfidence.visibility = View.VISIBLE
 
                 if (message.gemmaClassification != Constants.GEMMA_UNCERTAIN &&
                     !message.gemmaRationale.isNullOrEmpty()) {
@@ -228,7 +234,7 @@ class MessageDetailFragment : Fragment() {
 
             // Report is only available for flagged messages
             btnReport.visibility =
-                if (message.isFlagged) {
+                if (!analysisPending && message.isFlagged) {
                     View.VISIBLE
                 } else {
                     View.GONE
