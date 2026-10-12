@@ -1,7 +1,11 @@
 package com.apcida.smishingdetector.view.fragment
 
 import android.graphics.Color
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.ContactsContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,15 +14,18 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.network.ReportUploadManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.Report
+import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MessageDetailFragment : Fragment() {
@@ -31,6 +38,38 @@ class MessageDetailFragment : Fragment() {
     private lateinit var reportUploadManager: ReportUploadManager
 
     private var currentMessage: Message? = null
+    private var senderName: String? = null
+    private var senderLookupJob: Job? = null
+    private var lastResolvedAddress: String? = null
+    private var lastNamesEnabled = false
+    private var observingContacts = false
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            refreshSenderName(force = true)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (_binding != null) {
+            if (ContactNameResolver.isEnabled(requireContext()) && !observingContacts) {
+                requireContext().contentResolver.registerContentObserver(
+                    ContactsContract.Contacts.CONTENT_URI, true, contactsObserver
+                )
+                observingContacts = true
+            }
+            refreshSenderName(force = true)
+        }
+    }
+
+    override fun onPause() {
+        senderLookupJob?.cancel()
+        if (observingContacts) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            observingContacts = false
+        }
+        super.onPause()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -102,8 +141,10 @@ class MessageDetailFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             messageRepository.observeMessageById(messageId).collectLatest { message ->
                 if (message == null) return@collectLatest
+                if (message.senderAddress != lastResolvedAddress) senderName = null
                 currentMessage = message
                 displayMessage(message)
+                refreshSenderName()
             }
         }
     }
@@ -115,6 +156,8 @@ class MessageDetailFragment : Fragment() {
 
         binding.apply {
             val analysisPending = message.gemmaClassification == null
+
+            showSender(message)
 
             // ---------------------------------
             // Message content
@@ -356,7 +399,39 @@ class MessageDetailFragment : Fragment() {
         }
     }
 
+    private fun showSender(message: Message) {
+        if (_binding == null) return
+        binding.textSenderValue.text = senderName ?: message.senderAddress
+            ?: getString(R.string.unknown_sender)
+        binding.textSenderAddress.text = if (senderName != null) message.senderAddress else null
+        binding.textSenderAddress.visibility = if (senderName != null) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshSenderName(force: Boolean = false) {
+        if (_binding == null) return
+        val message = currentMessage ?: return
+        val enabled = ContactNameResolver.isEnabled(requireContext())
+        if (!force && message.senderAddress == lastResolvedAddress && enabled == lastNamesEnabled) {
+            return
+        }
+
+        lastResolvedAddress = message.senderAddress
+        lastNamesEnabled = enabled
+        senderLookupJob?.cancel()
+        senderName = null
+        showSender(message)
+        val address = message.senderAddress ?: return
+        if (!enabled) return
+
+        val context = requireContext().applicationContext
+        senderLookupJob = viewLifecycleOwner.lifecycleScope.launch {
+            senderName = ContactNameResolver.findName(context, address)
+            if (currentMessage?.senderAddress == address) showSender(message)
+        }
+    }
+
     override fun onDestroyView() {
+        senderLookupJob?.cancel()
         super.onDestroyView()
 
         _binding = null

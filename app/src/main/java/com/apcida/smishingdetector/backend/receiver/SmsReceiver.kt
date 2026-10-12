@@ -30,10 +30,10 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         // Group multi-part messages by sender and combine their bodies
-        val groupedMessages = mutableMapOf<String, StringBuilder>()
+        val groupedMessages = mutableMapOf<String?, StringBuilder>()
 
         for (smsMessage in messages) {
-            val sender = smsMessage.originatingAddress ?: "Unknown"
+            val sender = smsMessage.originatingAddress
             val body = smsMessage.messageBody ?: ""
             groupedMessages.getOrPut(sender) { StringBuilder() }.append(body)
         }

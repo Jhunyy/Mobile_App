@@ -20,6 +20,14 @@ class MessageListAdapter(
     private val isUnread: (Message) -> Boolean
 ) : ListAdapter<Message, MessageListAdapter.MessageViewHolder>(MessageDiffCallback()) {
 
+    private var contactNames: Map<String, String> = emptyMap()
+
+    fun setContactNames(names: Map<String, String>) {
+        if (contactNames == names) return
+        contactNames = names
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val binding = ItemMessageBinding.inflate(
             LayoutInflater.from(parent.context),
@@ -43,9 +51,8 @@ class MessageListAdapter(
                 val unread = isUnread(message)
                 val pending = message.gemmaInvoked && message.gemmaClassification == null
 
-                // Sender — show hashed sender as placeholder
-                // since raw sender is not stored
-                textSender.text = "Unknown Sender"
+                textSender.text = message.senderAddress?.let { contactNames[it] ?: it }
+                    ?: context.getString(R.string.unknown_sender)
 
                 // Message preview — first 100 characters
                 textPreview.text = message.content.take(100)

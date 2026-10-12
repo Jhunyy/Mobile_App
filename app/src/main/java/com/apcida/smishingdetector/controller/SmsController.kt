@@ -48,7 +48,7 @@ class SmsController internal constructor(
      * Entry point called by SmsReceiver when a new SMS arrives.
      * Runs the full two-stage detection pipeline.
      */
-    suspend fun onSmsReceived(sender: String, messageBody: String) {
+    suspend fun onSmsReceived(sender: String?, messageBody: String) {
         Log.d(TAG, "Processing new SMS")
 
         // Each received SMS is analyzed, even when its text repeats an earlier message.
@@ -65,7 +65,8 @@ class SmsController internal constructor(
 
         // ── Save Initial Message Record ───────────────────────
         val message = Message(
-            senderHash = HashUtil.hashSender(sender),
+            senderHash = sender?.takeIf { it.isNotBlank() }?.let(HashUtil::hashSender),
+            senderAddress = sender?.trim()?.takeIf { it.isNotEmpty() },
             content = messageBody,
             contentHash = contentHash,
             receivedAt = System.currentTimeMillis(),

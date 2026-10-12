@@ -57,7 +57,7 @@
             android:layout_marginTop="20dp"
             android:fontFamily="@font/dm_sans_regular"
             android:lineSpacingExtra="4dp"
-            android:text="deTEXT needs access to your SMS inbox to detect suspicious messages in real time.&#10;&#10;Your messages remain private – only keywords are analyzed locally on your device."
+            android:text="deTEXT needs access to your SMS inbox to detect suspicious messages in real time.&#10;&#10;Message analysis happens on your device. Contact names are optional and requested separately."
             android:textColor="@color/text_secondary"
             android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"

@@ -25,6 +25,7 @@ class SmsControllerTest {
             assertEquals(listOf("keywords", "gemma"), fixture.stages)
             assertEquals(listOf("Sample SMS" to fixture.keywords.map { it.pattern }), fixture.gemmaInputs)
             val saved = fixture.dao.messages.single()
+            assertEquals("sender", saved.senderAddress)
             assertEquals(score, saved.riskScore, 0.001f)
             assertTrue(saved.gemmaInvoked)
             assertEquals(Constants.GEMMA_LEGITIMATE, saved.gemmaClassification)
@@ -89,6 +90,16 @@ class SmsControllerTest {
         assertEquals(2, fixture.dao.messages.size)
         assertTrue(fixture.dao.messages.all { it.gemmaInvoked })
         assertEquals(2, fixture.dao.messages.map { it.messageId }.distinct().size)
+    }
+
+    @Test
+    fun missingSenderRemainsUnknownWithoutHashingPlaceholder() = runBlocking {
+        val fixture = Fixture(0f, legitimate())
+        fixture.controller.onSmsReceived(null, "Sample SMS")
+
+        val saved = fixture.dao.messages.single()
+        assertNull(saved.senderAddress)
+        assertNull(saved.senderHash)
     }
 
     @Test

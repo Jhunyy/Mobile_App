@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">ApCiDa</string>
+    <string name="unknown_sender">Unknown Sender</string>
+    <string name="show_contact_names">Show contact names</string>
+    <string name="hide_contact_names">Hide contact names</string>
+    <string name="contacts_permission_title">Show contact names?</string>
+    <string name="contacts_permission_explanation">Allow access to contacts to show saved names for message senders. Matching happens on this device. You can keep using messages without granting access.</string>
+    <string name="continue_label">Continue</string>
 </resources>

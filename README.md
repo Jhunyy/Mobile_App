@@ -117,6 +117,7 @@ implementation "androidx.navigation:navigation-ui-ktx:2.7.6"
 ```xml
 <uses-permission android:name="android.permission.RECEIVE_SMS"/>
 <uses-permission android:name="android.permission.READ_SMS"/>
+<uses-permission android:name="android.permission.READ_CONTACTS"/>
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 ```
@@ -141,7 +142,9 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 ## Notes
 
 - Keyword scores determine preliminary risk: 0–29 SAFE, 30–59 SUSPICIOUS, 60+ SCAM. Every score proceeds to Gemma.
-- Privacy by design: raw SMS content never leaves the device. Only anonymized metadata is sent when a report is submitted.
+- The reporting API sends anonymized metadata; it does not upload SMS content, sender addresses, or contact names.
+- New messages store the sender address locally so it can be shown in the inbox and detail screen. Existing messages keep "Unknown Sender" because their saved hashes cannot recover the address.
+- Contact names are optional. The inbox menu requests contacts access when the user chooses "Show contact names"; the app looks up only saved SMS sender numbers and does not save or upload contact names.
 
 ## Report Server Plan
 

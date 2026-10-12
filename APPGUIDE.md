@@ -147,10 +147,12 @@ The app currently requests/declares:
 
 - `RECEIVE_SMS`
 - `READ_SMS`
+- `READ_CONTACTS` (optional, requested from the inbox to show saved contact names)
 - `INTERNET`
 - `ACCESS_NETWORK_STATE`
 
 SMS permissions are required for the receiver and message scanning flow.
+The sender address is saved for new messages and shown in the inbox and message detail. With contacts access enabled, matching names are read on demand from the device; denying access leaves the sender address visible. Older messages have no recoverable sender address.
 
 ## Report Server Design
 

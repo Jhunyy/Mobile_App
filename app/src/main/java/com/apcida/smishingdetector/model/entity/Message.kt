@@ -14,6 +14,9 @@ data class Message(
     @ColumnInfo(name = "sender_hash")
     val senderHash: String? = null,
 
+    @ColumnInfo(name = "sender_address")
+    val senderAddress: String? = null,
+
     @ColumnInfo(name = "content")
     val content: String,
 

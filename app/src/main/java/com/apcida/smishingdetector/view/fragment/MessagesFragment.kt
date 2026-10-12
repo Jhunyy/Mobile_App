@@ -1,10 +1,17 @@
 package com.apcida.smishingdetector.view.fragment
 
+import android.Manifest
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.ContactsContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.core.widget.doAfterTextChanged
@@ -17,9 +24,11 @@ import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.databinding.FragmentMessagesBinding
 import com.apcida.smishingdetector.model.entity.Message
+import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.adapter.MessageListAdapter
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MessagesFragment : Fragment() {
@@ -35,6 +44,22 @@ class MessagesFragment : Fragment() {
     private var selectedFilter = InboxFilter.ALL
     private var newestFirst = true
     private val readMessageIds = mutableSetOf<String>()
+    private var contactNames: Map<String, String> = emptyMap()
+    private var contactLookupJob: Job? = null
+    private var observingContacts = false
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            refreshContactNames()
+        }
+    }
+    private val requestContactsPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        requireContext().getSharedPreferences(Constants.PREFS_NAME, 0).edit()
+            .putBoolean(Constants.PREF_CONTACT_NAMES_ENABLED, granted).apply()
+        updateContactsObserver()
+        refreshContactNames()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -53,6 +78,25 @@ class MessagesFragment : Fragment() {
         setupRecyclerView()
         setupInboxControls()
         observeMessages()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::adapter.isInitialized) {
+            updateContactsObserver()
+            refreshContactNames()
+        }
+    }
+
+    override fun onPause() {
+        stopContactsObserver()
+        super.onPause()
+    }
+
+    override fun onDestroyView() {
+        contactLookupJob?.cancel()
+        _binding = null
+        super.onDestroyView()
     }
 
     private fun setupRepository() {
@@ -142,6 +186,12 @@ class MessagesFragment : Fragment() {
 
         binding.btnMore.setOnClickListener { anchor ->
             PopupMenu(requireContext(), anchor).apply {
+                menu.add(if (ContactNameResolver.isEnabled(requireContext()))
+                    getString(R.string.hide_contact_names)
+                else getString(R.string.show_contact_names)).setOnMenuItemClickListener {
+                    toggleContactNames()
+                    true
+                }
                 menu.add("Mark all as read").setOnMenuItemClickListener {
                     readMessageIds.addAll(allMessages.map { it.messageId.toString() })
                     saveReadState()
@@ -166,6 +216,7 @@ class MessagesFragment : Fragment() {
             messageRepository.getAllMessages().collectLatest { messages ->
                 allMessages = messages
                 renderMessages()
+                refreshContactNames()
             }
         }
     }
@@ -181,7 +232,12 @@ class MessagesFragment : Fragment() {
                     InboxFilter.UNREAD -> message.messageId.toString() !in readMessageIds
                 }
             }
-            .filter { query.isEmpty() || it.content.contains(query, ignoreCase = true) }
+            .filter { message -> query.isEmpty() ||
+                message.content.contains(query, ignoreCase = true) ||
+                message.senderAddress?.contains(query, ignoreCase = true) == true ||
+                message.senderAddress?.let(contactNames::get)
+                    ?.contains(query, ignoreCase = true) == true
+            }
             .sortedWith(if (newestFirst) compareByDescending { it.receivedAt }
                         else compareBy { it.receivedAt })
             .toList()
@@ -198,8 +254,70 @@ class MessagesFragment : Fragment() {
         }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    private fun toggleContactNames() {
+        if (ContactNameResolver.isEnabled(requireContext())) {
+            requireContext().getSharedPreferences(Constants.PREFS_NAME, 0).edit()
+                .putBoolean(Constants.PREF_CONTACT_NAMES_ENABLED, false).apply()
+            updateContactsObserver()
+            refreshContactNames()
+        } else if (ContactNameResolver.hasPermission(requireContext())) {
+            requireContext().getSharedPreferences(Constants.PREFS_NAME, 0).edit()
+                .putBoolean(Constants.PREF_CONTACT_NAMES_ENABLED, true).apply()
+            updateContactsObserver()
+            refreshContactNames()
+        } else {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.contacts_permission_title)
+                .setMessage(R.string.contacts_permission_explanation)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.continue_label) { _, _ ->
+                    requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
+                }
+                .show()
+        }
     }
+
+    private fun updateContactsObserver() {
+        val shouldObserve = ContactNameResolver.isEnabled(requireContext())
+        if (shouldObserve && !observingContacts) {
+            requireContext().contentResolver.registerContentObserver(
+                ContactsContract.Contacts.CONTENT_URI, true, contactsObserver
+            )
+            observingContacts = true
+        } else if (!shouldObserve) {
+            stopContactsObserver()
+        }
+    }
+
+    private fun stopContactsObserver() {
+        if (observingContacts) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            observingContacts = false
+        }
+    }
+
+    private fun refreshContactNames() {
+        if (!::adapter.isInitialized || _binding == null) return
+        contactLookupJob?.cancel()
+        if (!ContactNameResolver.isEnabled(requireContext())) {
+            contactNames = emptyMap()
+            adapter.setContactNames(contactNames)
+            renderMessages()
+            return
+        }
+
+        val context = requireContext().applicationContext
+        val addresses = allMessages.mapNotNull { it.senderAddress }.distinct()
+        contactLookupJob = viewLifecycleOwner.lifecycleScope.launch {
+            val names = buildMap {
+                for (address in addresses) {
+                    ContactNameResolver.findName(context, address)?.let { put(address, it) }
+                }
+            }
+            contactNames = names
+            adapter.setContactNames(names)
+            renderMessages()
+        }
+    }
+
 }
