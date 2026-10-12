@@ -147,7 +147,7 @@ The app currently requests/declares:
 
 - `RECEIVE_SMS`
 - `READ_SMS`
-- `READ_CONTACTS` (optional, requested from the inbox to show saved contact names)
+- `READ_CONTACTS` (optional, offered once in the inbox to show saved contact names)
 - `INTERNET`
 - `ACCESS_NETWORK_STATE`
 

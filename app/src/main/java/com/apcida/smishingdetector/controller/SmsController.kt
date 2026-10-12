@@ -6,6 +6,7 @@ import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.detection.KeywordEngine
 import com.apcida.smishingdetector.backend.detection.DecisionEngine
 import com.apcida.smishingdetector.backend.detection.RiskScorer
+import com.apcida.smishingdetector.backend.detection.ContactRiskAdjustment
 import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
@@ -16,6 +17,7 @@ import com.apcida.smishingdetector.model.entity.Keyword
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.MessageKeyword
 import com.apcida.smishingdetector.util.Constants
+import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.HashUtil
 import com.apcida.smishingdetector.util.NotificationHelper
 
@@ -23,6 +25,7 @@ class SmsController internal constructor(
     private val messageRepository: MessageRepository,
     private val analyzeKeywords: suspend (String) -> List<Keyword>,
     private val saveKeywordMatches: suspend (List<MessageKeyword>) -> Unit,
+    private val isSavedContact: suspend (String?) -> Boolean,
     private val validateWithGemma: suspend (String, List<String>) -> GemmaResult,
     private val notifyScam: (DetectionResult, Long) -> Unit
 ) {
@@ -31,6 +34,15 @@ class SmsController internal constructor(
         messageRepository = MessageRepository(AppDatabase.getInstance(context).messageDao()),
         analyzeKeywords = KeywordEngine(AppDatabase.getInstance(context).keywordDao())::analyze,
         saveKeywordMatches = AppDatabase.getInstance(context).messageKeywordDao()::insertAllMessageKeywords,
+        isSavedContact = { sender ->
+            if (sender == null || !ContactNameResolver.isEnabled(context)) false
+            else try {
+                ContactNameResolver.findName(context, sender) != null
+            } catch (e: Exception) {
+                Log.w("SmsController", "Contact lookup unavailable", e)
+                false
+            }
+        },
         validateWithGemma = GemmaManager.getValidator(context)::validate,
         notifyScam = { result, messageId ->
             NotificationHelper.showScamAlert(context.applicationContext, result, messageId)
@@ -57,7 +69,9 @@ class SmsController internal constructor(
         // ── Stage 1: Keyword Engine ───────────────────────────
         Log.d(TAG, "Stage 1: Running keyword engine...")
         val matchedKeywords = analyzeKeywords(messageBody)
-        val riskScore = riskScorer.compute(matchedKeywords)
+        val riskScore = ContactRiskAdjustment.apply(
+            riskScorer.compute(matchedKeywords), isSavedContact(sender)
+        )
         val riskLevel = thresholdEvaluator.evaluate(riskScore)
         val isFlagged = riskLevel != RiskLevel.SAFE
 

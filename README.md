@@ -5,7 +5,7 @@ Android application for detecting SMS phishing ("smishing") messages using a two
 ## How Detection Works
 
 **Stage 1 — Keyword Analysis**
-Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a risk score, which determines a preliminary risk level.
+Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a risk score. When contact names are enabled and the sender number matches a saved contact, the score drops by up to 5 points without changing its preliminary risk level. Contact membership does not verify sender identity.
 
 **Stage 2 — On-Device LLM Validation**
 Every incoming message is passed to Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords, for a contextual classification, confidence score, and rationale.
@@ -14,7 +14,7 @@ Every incoming message is passed to Gemma (running fully on-device via MediaPipe
 SMS received
     │
     ▼
-Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
+Stage 1: KeywordEngine → RiskScorer → ContactRiskAdjustment → ThresholdEvaluator
     │
     └── every message, regardless of score
             │
@@ -144,7 +144,7 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 - Keyword scores determine preliminary risk: 0–29 SAFE, 30–59 SUSPICIOUS, 60+ SCAM. Every score proceeds to Gemma.
 - The reporting API sends anonymized metadata; it does not upload SMS content, sender addresses, or contact names.
 - New messages store the sender address locally so it can be shown in the inbox and detail screen. Existing messages keep "Unknown Sender" because their saved hashes cannot recover the address.
-- Contact names are optional. The inbox menu requests contacts access when the user chooses "Show contact names"; the app looks up only saved SMS sender numbers and does not save or upload contact names.
+- Contact names are optional. The inbox offers contact access once and keeps a Show/Hide contact names menu option. The app looks up only saved SMS sender numbers and does not save or upload contact names. Unknown numbers and alphanumeric sender IDs display as received. A matching contact can lower the score by up to 5 points, but cannot move a message into a safer risk band.
 
 ## Report Server Plan
 

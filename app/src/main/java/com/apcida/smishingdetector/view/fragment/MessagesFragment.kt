@@ -78,6 +78,7 @@ class MessagesFragment : Fragment() {
         setupRecyclerView()
         setupInboxControls()
         observeMessages()
+        offerContactNamesOnce()
     }
 
     override fun onResume() {
@@ -275,6 +276,28 @@ class MessagesFragment : Fragment() {
                 }
                 .show()
         }
+    }
+
+    private fun offerContactNamesOnce() {
+        val preferences = requireContext().getSharedPreferences(Constants.PREFS_NAME, 0)
+        if (preferences.getBoolean(Constants.PREF_CONTACT_PROMPT_SHOWN, false) ||
+            ContactNameResolver.isEnabled(requireContext())) return
+
+        preferences.edit().putBoolean(Constants.PREF_CONTACT_PROMPT_SHOWN, true).apply()
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.contacts_permission_title)
+            .setMessage(R.string.contacts_permission_explanation)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.continue_label) { _, _ ->
+                if (ContactNameResolver.hasPermission(requireContext())) {
+                    preferences.edit().putBoolean(Constants.PREF_CONTACT_NAMES_ENABLED, true).apply()
+                    updateContactsObserver()
+                    refreshContactNames()
+                } else {
+                    requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
+                }
+            }
+            .show()
     }
 
     private fun updateContactsObserver() {

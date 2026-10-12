@@ -4,6 +4,6 @@
     <string name="show_contact_names">Show contact names</string>
     <string name="hide_contact_names">Hide contact names</string>
     <string name="contacts_permission_title">Show contact names?</string>
-    <string name="contacts_permission_explanation">Allow access to contacts to show saved names for message senders. Matching happens on this device. You can keep using messages without granting access.</string>
+    <string name="contacts_permission_explanation">Show saved contact names for matching sender numbers in your inbox and message details. Other senders will show their number or sender ID. Matching stays on this device. You can keep using messages without granting access.</string>
     <string name="continue_label">Continue</string>
 </resources>

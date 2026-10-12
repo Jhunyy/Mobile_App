@@ -117,13 +117,23 @@ class SmsControllerTest {
         }
     }
 
+    @Test
+    fun savedContactGetsSmallDiscountButSuspiciousRiskRemains() = runBlocking {
+        val fixture = Fixture(35f, GemmaResult.fallback(), savedContact = true)
+        fixture.controller.onSmsReceived("+639171234567", "Visit https://example.com to verify.")
+
+        val saved = fixture.dao.messages.single()
+        assertEquals(30f, saved.riskScore, 0.001f)
+        assertEquals(RiskLevel.SUSPICIOUS.name, saved.riskLevel)
+    }
+
     private fun legitimate() = GemmaResult(
         classification = Constants.GEMMA_LEGITIMATE,
         confidence = Constants.CONFIDENCE_HIGH,
         rationale = "Contextual result"
     )
 
-    private class Fixture(score: Float, result: GemmaResult) {
+    private class Fixture(score: Float, result: GemmaResult, savedContact: Boolean = false) {
         val dao = InMemoryMessageDao()
         val stages = mutableListOf<String>()
         val gemmaInputs = mutableListOf<Pair<String, List<String>>>()
@@ -136,6 +146,7 @@ class SmsControllerTest {
             messageRepository = MessageRepository(dao),
             analyzeKeywords = { stages.add("keywords"); keywords },
             saveKeywordMatches = { matches.addAll(it) },
+            isSavedContact = { savedContact },
             validateWithGemma = { body, patterns ->
                 stages.add("gemma")
                 gemmaInputs.add(body to patterns)

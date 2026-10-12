@@ -177,7 +177,7 @@ class MessageDetailFragment : Fragment() {
             }
 
             textRiskScore.text =
-                "Keyword risk score: ${message.riskScore.toInt()}"
+                "Risk score: ${message.riskScore.toInt()}"
 
             // ---------------------------------
             // Risk card background

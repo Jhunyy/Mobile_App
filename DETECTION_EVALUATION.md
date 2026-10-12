@@ -16,6 +16,8 @@ Record for each message: a stable ID, redacted text, language (English, Filipino
 
 Include hard legitimate examples: routine OTP delivery, bank notices, delivery updates, appointment reminders, and promotional messages. Include scam examples with unfamiliar wording and no seeded keyword. Do not label a message SCAM solely because it has an unfamiliar domain, poor grammar, urgency, or a brand name.
 
+Evaluate the up-to-5-point saved-contact discount before treating that weight as calibrated. Test routine messages, spoofed numbers, and risky requests from saved contacts. Contact membership does not establish sender authenticity, and the discount must not move a message into a safer risk band.
+
 ## Evaluation method
 
 1. Freeze a held-out test set before changing prompts, keyword weights, thresholds, or model weights. Keep messages from the same campaign or near-duplicate template in the same split.
