@@ -1,7 +1,11 @@
 package com.apcida.smishingdetector.view.fragment
 
 import android.graphics.Color
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.ContactsContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +14,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
@@ -18,10 +23,12 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.model.data.AiAnalysisStatus
 import com.apcida.smishingdetector.model.data.ProcessingState
+import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class MessageDetailFragment : Fragment() {
 
@@ -30,157 +37,360 @@ class MessageDetailFragment : Fragment() {
 
     private lateinit var messageRepository: MessageRepository
     private lateinit var reportRepository: ReportRepository
+
     private var currentMessage: Message? = null
+    private var senderName: String? = null
+    private var senderLookupJob: Job? = null
+    private var lastResolvedAddress: String? = null
+    private var lastNamesEnabled = false
+    private var observingContacts = false
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            refreshSenderName(force = true)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (_binding != null) {
+            if (ContactNameResolver.isEnabled(requireContext()) && !observingContacts) {
+                requireContext().contentResolver.registerContentObserver(
+                    ContactsContract.Contacts.CONTENT_URI, true, contactsObserver
+                )
+                observingContacts = true
+            }
+            refreshSenderName(force = true)
+        }
+    }
+
+    override fun onPause() {
+        senderLookupJob?.cancel()
+        if (observingContacts) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            observingContacts = false
+        }
+        super.onPause()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentMessageDetailBinding.inflate(inflater, container, false)
+
+        _binding = FragmentMessageDetailBinding.inflate(
+            inflater,
+            container,
+            false
+        )
+
         return binding.root
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
         setupRepositories()
-
-        // Get messageId passed from MessagesFragment
-        val messageId = arguments?.getLong("messageId") ?: return
-        loadMessage(messageId)
-
+        setupBackButton()
         setupActionButtons()
+
+        // Get the message ID passed from MessagesFragment
+        val messageId = arguments?.getLong("messageId") ?: return
+
+        observeMessage(messageId)
     }
 
+    /**
+     * Initialize repositories used by this screen.
+     */
     private fun setupRepositories() {
-        val database = AppDatabase.getInstance(requireContext())
-        messageRepository = MessageRepository(database.messageDao())
-        reportRepository = ReportRepository(database.reportDao())
+
+        val database = AppDatabase.getInstance(
+            requireContext()
+        )
+
+        messageRepository = MessageRepository(
+            database.messageDao()
+        )
+
+        reportRepository = ReportRepository(
+            database.reportDao()
+        )
+
     }
 
-    private fun loadMessage(messageId: Long) {
+    /**
+     * Back arrow in the Message Details header.
+     */
+    private fun setupBackButton() {
+
+        binding.btnBack.setOnClickListener {
+            findNavController().navigateUp()
+        }
+    }
+
+    /**
+     * Keep the details current while Gemma updates the saved message.
+     */
+    private fun observeMessage(messageId: Long) {
         viewLifecycleOwner.lifecycleScope.launch {
             messageRepository.observeMessageById(messageId).collectLatest { message ->
-                message?.let {
-                    currentMessage = it
-                    displayMessage(it)
-                }
+                if (message == null) return@collectLatest
+                if (message.senderAddress != lastResolvedAddress) senderName = null
+                currentMessage = message
+                displayMessage(message)
+                refreshSenderName()
             }
         }
     }
 
+    /**
+     * Display message information and risk result.
+     */
     private fun displayMessage(message: Message) {
+
         binding.apply {
-
-            // Message content
-            textMessageContent.text = message.content
-
-            // Risk status
-            textRiskStatus.text = message.finalClassification
-            textRiskScore.text =
-                "Rule result: ${message.deterministicRiskLevel} • Score: ${message.riskScore.toInt()}"
-
-            // Risk card background color
-            val bgColor = when (message.finalClassification) {
-                Constants.RISK_SCAM -> Color.parseColor("#FFEBEE")
-                Constants.RISK_SUSPICIOUS -> Color.parseColor("#FFF3E0")
-                else -> Color.parseColor("#E8F5E9")
-            }
-            cardRiskStatus.setCardBackgroundColor(bgColor)
-
-            // Risk status text color
-            val textColor = when (message.finalClassification) {
-                Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
-                else -> Color.parseColor("#2E7D32")
-            }
-            textRiskStatus.setTextColor(textColor)
-
-            val isAnalyzing = message.processingState in setOf(
+            val analysisPending = message.processingState in setOf(
                 ProcessingState.PENDING.name,
                 ProcessingState.RULE_ANALYZED.name,
                 ProcessingState.AI_QUEUED.name,
                 ProcessingState.AI_ANALYZING.name
             )
-            if (isAnalyzing) {
+
+            showSender(message)
+
+            // ---------------------------------
+            // Message content
+            // ---------------------------------
+
+            textMessageContent.text = message.content
+
+            // ---------------------------------
+            // Risk status
+            // ---------------------------------
+
+            textRiskStatus.text = when {
+                analysisPending -> "Analyzing message…"
+                message.finalClassification == Constants.RISK_SCAM -> "Likely scam"
+                message.finalClassification == Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
+                else -> "No scam indicators found"
+            }
+
+            textRiskScore.text =
+                "Risk score: ${message.riskScore.toInt()}"
+
+            // ---------------------------------
+            // Risk card background
+            // ---------------------------------
+
+            val backgroundColor =
+                when {
+                    analysisPending -> Color.parseColor("#EAF0F7")
+
+                    message.finalClassification == Constants.RISK_SCAM ->
+                        Color.parseColor("#FDECEC")
+
+                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                        Color.parseColor("#FFF4E4")
+
+                    else ->
+                        Color.parseColor("#EAF6EE")
+                }
+
+            cardRiskStatus.setCardBackgroundColor(
+                backgroundColor
+            )
+
+            // ---------------------------------
+            // Risk status text color
+            // ---------------------------------
+
+            val statusColor =
+                when {
+                    analysisPending -> Color.parseColor("#34556B")
+
+                    message.finalClassification == Constants.RISK_SCAM ->
+                        Color.parseColor("#CA433C")
+
+                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                        Color.parseColor("#F2A33A")
+
+                    else ->
+                        Color.parseColor("#65B17F")
+                }
+
+            textRiskStatus.setTextColor(statusColor)
+
+            // ---------------------------------
+            // Gemma AI Analysis
+            // ---------------------------------
+
+            if (analysisPending) {
                 cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = "On-device AI analysis is in progress."
-                textGemmaConfidence.text = "Status: Analyzing"
+                textGemmaRationale.text = "Analyzing this message on your device…"
+                textGemmaConfidence.visibility = View.GONE
             } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
                 cardGemmaAnalysis.visibility = View.VISIBLE
                 textGemmaRationale.text = message.gemmaRationale
-                    ?: "AI analysis is unavailable; the deterministic result was preserved."
+                    ?: "AI analysis is unavailable; the rule result was preserved."
+                textGemmaConfidence.visibility = View.VISIBLE
                 textGemmaConfidence.text = "Status: AI unavailable"
-            } else if (message.gemmaInvoked && !message.gemmaRationale.isNullOrEmpty()) {
+            } else if (message.gemmaInvoked) {
+
+                // Gemma was attempted, so show the card
                 cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = message.gemmaRationale
-                textGemmaConfidence.text =
-                    "${message.gemmaClassification} • Confidence: ${message.gemmaConfidence ?: "N/A"}"
+                textGemmaConfidence.visibility = View.VISIBLE
+
+                if (message.gemmaClassification != Constants.GEMMA_UNCERTAIN &&
+                    !message.gemmaRationale.isNullOrEmpty()) {
+
+                    // Gemma successfully returned an explanation
+                    textGemmaRationale.text = when {
+                        message.gemmaClassification == Constants.GEMMA_SCAM &&
+                            message.finalClassification != Constants.RISK_SCAM ->
+                            "The AI suggested scam, but the available evidence did not justify a scam alert. ${message.gemmaRationale}"
+                        message.finalClassification == Constants.RISK_SUSPICIOUS &&
+                            message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
+                            "Keyword indicators remain; verify independently. ${message.gemmaRationale}"
+                        else -> message.gemmaRationale
+                    }
+
+                    textGemmaConfidence.text =
+                        "Confidence: ${message.gemmaConfidence ?: "N/A"}"
+
+                } else {
+
+                    // Gemma was invoked but inference was unavailable
+                    textGemmaRationale.text = if (message.gemmaConfidence == null) {
+                        "Contextual analysis was unavailable. Classification based on keyword scoring only."
+                    } else {
+                        message.gemmaRationale ?: "Contextual analysis was inconclusive."
+                    }
+
+                    textGemmaConfidence.text =
+                        "Confidence: ${message.gemmaConfidence ?: "LOW"}"
+                }
+
             } else {
+
+                // Gemma was never invoked for this message
                 cardGemmaAnalysis.visibility = View.GONE
             }
 
-            // Any saved message can receive optional feedback about its scan.
+            // ---------------------------------
+            // Report button
+            // ---------------------------------
+
             btnReport.visibility = View.VISIBLE
         }
     }
 
+    /**
+     * Set up Report, Delete, and Ignore buttons.
+     */
     private fun setupActionButtons() {
+
         binding.apply {
 
-            // Report button
+            // ----------------------------
+            // REPORT
+            // ----------------------------
+
             btnReport.setOnClickListener {
+
                 currentMessage?.let { message ->
                     showReportDialog(message)
                 }
             }
 
-            // Delete button
+            // ----------------------------
+            // DELETE
+            // ----------------------------
+
             btnDelete.setOnClickListener {
+
                 currentMessage?.let { message ->
+
                     viewLifecycleOwner.lifecycleScope.launch {
-                        messageRepository.deleteMessage(message)
+
+                        messageRepository.deleteMessage(
+                            message
+                        )
+
+                        Toast.makeText(
+                            requireContext(),
+                            "Message deleted",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
                         findNavController().navigateUp()
                     }
                 }
             }
 
-            // Ignore button
+            // ----------------------------
+            // IGNORE
+            // ----------------------------
+
             btnIgnore.setOnClickListener {
                 findNavController().navigateUp()
             }
         }
     }
 
+    /**
+     * Open the custom Report Message dialog.
+     */
     private fun showReportDialog(message: Message) {
+
         val dialog = ReportFormDialog(
             context = requireContext(),
             message = message,
-            onReportSubmitted = { reportType, remarks ->
-                submitReport(message, reportType, remarks)
+
+            onReportSubmitted = {
+                    reportType,
+                    remarks ->
+
+                submitReport(
+                    message = message,
+                    reportType = reportType,
+                    remarks = remarks
+                )
             }
         )
+
         dialog.show()
     }
 
+    /**
+     * Save the report locally, then attempt upload.
+     */
     private fun submitReport(
         message: Message,
         reportType: String,
         remarks: String?
     ) {
+
         viewLifecycleOwner.lifecycleScope.launch {
+
             val report = Report(
                 messageId = message.messageId,
                 reportType = reportType,
                 remarks = remarks,
                 riskScoreSnapshot = message.riskScore,
-                gemmaClassificationSnapshot = message.gemmaClassification,
-                gemmaRationaleSnapshot = message.gemmaRationale,
+                gemmaClassificationSnapshot =
+                    message.gemmaClassification,
+                gemmaRationaleSnapshot =
+                    message.gemmaRationale,
                 isSent = false
             )
+
             reportRepository.insertReport(report)
             ReportUploadWorker.enqueue(requireContext().applicationContext)
+
             Toast.makeText(
                 requireContext(),
                 "Report saved. Upload will run when the server is available.",
@@ -189,8 +399,41 @@ class MessageDetailFragment : Fragment() {
         }
     }
 
+    private fun showSender(message: Message) {
+        if (_binding == null) return
+        binding.textSenderValue.text = senderName ?: message.senderAddress
+            ?: getString(R.string.unknown_sender)
+        binding.textSenderAddress.text = if (senderName != null) message.senderAddress else null
+        binding.textSenderAddress.visibility = if (senderName != null) View.VISIBLE else View.GONE
+    }
+
+    private fun refreshSenderName(force: Boolean = false) {
+        if (_binding == null) return
+        val message = currentMessage ?: return
+        val enabled = ContactNameResolver.isEnabled(requireContext())
+        if (!force && message.senderAddress == lastResolvedAddress && enabled == lastNamesEnabled) {
+            return
+        }
+
+        lastResolvedAddress = message.senderAddress
+        lastNamesEnabled = enabled
+        senderLookupJob?.cancel()
+        senderName = null
+        showSender(message)
+        val address = message.senderAddress ?: return
+        if (!enabled) return
+
+        val context = requireContext().applicationContext
+        senderLookupJob = viewLifecycleOwner.lifecycleScope.launch {
+            senderName = ContactNameResolver.findName(context, address)
+            if (currentMessage?.senderAddress == address) showSender(message)
+        }
+    }
+
     override fun onDestroyView() {
+        senderLookupJob?.cancel()
         super.onDestroyView()
+
         _binding = null
     }
 }

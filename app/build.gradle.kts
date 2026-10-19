@@ -87,7 +87,7 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // MediaPipe LLM Inference (Gemma)
+    // MediaPipe LLM Inference
     implementation(libs.mediapipe.tasks.genai)
 
     // Networking

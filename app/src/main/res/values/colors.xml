@@ -1,27 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- Base colors -->
     <color name="white">#FFFFFF</color>
-    <color name="black">#000000</color>
+    <color name="black">#1E1E1E</color>
 
     <!-- Primary brand colors -->
-    <color name="primary">#1565C0</color>
-    <color name="primary_dark">#003c8f</color>
-    <color name="primary_light">#5e92f3</color>
+    <color name="primary">#46B37A</color>
+    <color name="primary_dark">#4F9668</color>
+    <color name="primary_light">#EAF6EE</color>
     <color name="on_primary">#FFFFFF</color>
 
     <!-- Risk level colors -->
-    <color name="color_safe">#2E7D32</color>
-    <color name="color_safe_bg">#E8F5E9</color>
-    <color name="color_suspicious">#E65100</color>
-    <color name="color_suspicious_bg">#FFF3E0</color>
-    <color name="color_scam">#B71C1C</color>
-    <color name="color_scam_bg">#FFEBEE</color>
+    <color name="color_safe">#65B17F</color>
+    <color name="color_safe_bg">#EAF6EE</color>
+
+    <color name="color_suspicious">#F2A33A</color>
+    <color name="color_suspicious_bg">#FFF4E4</color>
+
+    <color name="color_scam">#CA433C</color>
+    <color name="color_scam_bg">#FDECEC</color>
 
     <!-- UI colors -->
-    <color name="background">#F5F5F5</color>
+    <color name="background">#FBFBFB</color>
     <color name="surface">#FFFFFF</color>
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="divider">#BDBDBD</color>
+
+    <color name="text_primary">#1E1E1E</color>
+    <color name="text_secondary">#656565</color>
+    <color name="text_disabled">#8D8D8D</color>
+
+    <color name="divider">#E8E8E8</color>
     <color name="bottom_nav_bg">#FFFFFF</color>
+
+    <!-- Action colors -->
+    <color name="button_dark">#1E1E1E</color>
+    <color name="button_danger">#CA433C</color>
+
+    <!-- Overlay -->
+    <color name="overlay">#70000000</color>
+
+    <!-- Message inbox -->
+    <color name="inbox_green">#00A86B</color>
+    <color name="inbox_green_soft">#DDF5E9</color>
+    <color name="inbox_text">#14151B</color>
+    <color name="inbox_muted">#777B87</color>
+    <color name="inbox_search">#F2F3F5</color>
+    <color name="inbox_chip">#F1F2F4</color>
+    <color name="inbox_card_border">#E8EAED</color>
+    <color name="inbox_unread_border">#F6D5D8</color>
+    <color name="inbox_unread_bg">#FFF8F8</color>
+    <color name="inbox_scam">#D60019</color>
+    <color name="inbox_scam_soft">#FCE5E7</color>
+    <color name="inbox_safe">#218957</color>
+    <color name="inbox_safe_soft">#E5F4E9</color>
+    <color name="inbox_suspicious">#A86508</color>
+    <color name="inbox_suspicious_soft">#FFF1D8</color>
+    <color name="inbox_pending">#346783</color>
+    <color name="inbox_pending_soft">#E8F0F6</color>
+
 </resources>

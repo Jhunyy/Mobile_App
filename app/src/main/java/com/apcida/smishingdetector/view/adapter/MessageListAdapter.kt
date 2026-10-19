@@ -1,24 +1,33 @@
 package com.apcida.smishingdetector.view.adapter
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ItemMessageBinding
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.util.Constants
-import com.apcida.smishingdetector.util.DateUtil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MessageListAdapter(
-    private val onMessageClick: (Message) -> Unit
+    private val onMessageClick: (Message) -> Unit,
+    private val isUnread: (Message) -> Boolean
 ) : ListAdapter<Message, MessageListAdapter.MessageViewHolder>(MessageDiffCallback()) {
+
+    private var contactNames: Map<String, String> = emptyMap()
+
+    fun setContactNames(names: Map<String, String>) {
+        if (contactNames == names) return
+        contactNames = names
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val binding = ItemMessageBinding.inflate(
@@ -39,16 +48,17 @@ class MessageListAdapter(
 
         fun bind(message: Message) {
             binding.apply {
-                val isAnalyzing = message.processingState in setOf(
+                val context = root.context
+                val unread = isUnread(message)
+                val pending = message.processingState in setOf(
                     ProcessingState.PENDING.name,
                     ProcessingState.RULE_ANALYZED.name,
                     ProcessingState.AI_QUEUED.name,
                     ProcessingState.AI_ANALYZING.name
                 )
 
-                // Sender — show hashed sender as placeholder
-                // since raw sender is not stored
-                textSender.text = "Unknown Sender"
+                textSender.text = message.senderAddress?.let { contactNames[it] ?: it }
+                    ?: context.getString(R.string.unknown_sender)
 
                 // Message preview — first 100 characters
                 textPreview.text = message.content.take(100)
@@ -56,33 +66,36 @@ class MessageListAdapter(
                 // Time
                 textTime.text = formatTime(message.receivedAt)
 
-                // Risk indicator dot color
                 val indicatorColor = when {
-                    isAnalyzing -> Color.parseColor("#1565C0")
-                    message.finalClassification == Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                    message.finalClassification == Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
-                    else -> Color.parseColor("#2E7D32")
+                    pending -> ContextCompat.getColor(context, R.color.inbox_pending)
+                    message.finalClassification == Constants.RISK_SCAM ->
+                        ContextCompat.getColor(context, R.color.inbox_scam)
+                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                        ContextCompat.getColor(context, R.color.inbox_suspicious)
+                    else -> ContextCompat.getColor(context, R.color.inbox_safe)
                 }
-                riskIndicator.setBackgroundColor(indicatorColor)
+                avatarCircle.setCardBackgroundColor(indicatorColor)
+                unreadDot.visibility = if (unread) View.VISIBLE else View.GONE
+                cardMessage.setCardBackgroundColor(ContextCompat.getColor(
+                    context, if (unread) R.color.inbox_unread_bg else R.color.white
+                ))
+                cardMessage.strokeColor = ContextCompat.getColor(
+                    context, if (unread) R.color.inbox_unread_border else R.color.inbox_card_border
+                )
 
-                // Risk badge
-                if (isAnalyzing || message.isFlagged) {
-                    textRiskBadge.visibility = View.VISIBLE
-                    textRiskBadge.text = if (isAnalyzing) "ANALYZING" else message.finalClassification
-
-                    val badgeColor = when {
-                        isAnalyzing -> Color.parseColor("#1565C0")
-                        message.finalClassification == Constants.RISK_SCAM -> Color.parseColor("#B71C1C")
-                        message.finalClassification == Constants.RISK_SUSPICIOUS -> Color.parseColor("#E65100")
-                        else -> Color.parseColor("#2E7D32")
-                    }
-                    textRiskBadge.setBackgroundColor(badgeColor)
-                } else {
-                    textRiskBadge.visibility = View.GONE
+                textRiskBadge.visibility = View.VISIBLE
+                textRiskBadge.text = if (pending) "ANALYZING" else message.finalClassification
+                val badgeBackground = when {
+                    pending -> R.drawable.bg_inbox_badge_pending
+                    message.finalClassification == Constants.RISK_SCAM -> R.drawable.bg_inbox_badge_scam
+                    message.finalClassification == Constants.RISK_SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
+                    else -> R.drawable.bg_inbox_badge_safe
                 }
+                textRiskBadge.setBackgroundResource(badgeBackground)
+                textRiskBadge.setTextColor(indicatorColor)
 
                 // Click listener
-                root.setOnClickListener {
+                cardMessage.setOnClickListener {
                     onMessageClick(message)
                 }
             }

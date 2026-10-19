@@ -5,6 +5,7 @@ import android.util.Log
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.detection.AiEligibilityPolicy
+import com.apcida.smishingdetector.backend.detection.ContactRiskAdjustment
 import com.apcida.smishingdetector.backend.detection.DuplicatePolicy
 import com.apcida.smishingdetector.backend.detection.FinalVerdictResolver
 import com.apcida.smishingdetector.backend.detection.KeywordEngine
@@ -21,6 +22,7 @@ import com.apcida.smishingdetector.model.entity.Keyword
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.model.entity.MessageKeyword
 import com.apcida.smishingdetector.util.Constants
+import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.HashUtil
 import com.apcida.smishingdetector.util.NotificationHelper
 import kotlinx.coroutines.withTimeoutOrNull
@@ -61,8 +63,10 @@ class SmsController(context: Context) {
             return IntakeResult(duplicate.messageId, shouldEnqueueAi = false)
         }
 
+        val senderAddress = sender.takeIf { it.isNotBlank() && it != "Unknown" }
         val pendingMessage = Message(
             senderHash = senderHash,
+            senderAddress = senderAddress,
             content = messageBody,
             contentHash = contentHash,
             receivedAt = receivedAt,
@@ -73,7 +77,21 @@ class SmsController(context: Context) {
         require(messageId > 0) { "Failed to persist incoming SMS." }
 
         val matchedKeywords = keywordEngine.analyze(messageBody)
-        val riskScore = riskScorer.compute(matchedKeywords)
+        val isSavedContact = if (senderAddress != null &&
+            ContactNameResolver.isEnabled(applicationContext)
+        ) {
+            try {
+                ContactNameResolver.findName(applicationContext, senderAddress) != null
+            } catch (error: Exception) {
+                Log.w(TAG, "Contact lookup unavailable", error)
+                false
+            }
+        } else {
+            false
+        }
+        val riskScore = ContactRiskAdjustment.apply(
+            riskScorer.compute(matchedKeywords), isSavedContact
+        )
         val ruleRiskLevel = thresholdEvaluator.evaluate(riskScore)
         val indicators = matchedKeywords.map { it.pattern }.distinct()
 

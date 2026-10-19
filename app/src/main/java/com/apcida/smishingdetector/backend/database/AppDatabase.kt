@@ -25,7 +25,7 @@ import com.apcida.smishingdetector.model.entity.SafetyTip
         Report::class,
         SafetyTip::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,41 +38,30 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
 
-        // Singleton instance — only one database connection across the app
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
-
-        fun getInstance(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "kasds_database"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    .build()
-                INSTANCE = instance
-                instance
+        // Both branches used version 2 for different additive message columns.
+        // Add only missing columns so either installed schema keeps its rows.
+        private fun addMissingMessageColumns(database: SupportSQLiteDatabase) {
+            val columns = mutableSetOf<String>()
+            database.query("PRAGMA table_info(messages)").use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                while (cursor.moveToNext()) columns.add(cursor.getString(nameIndex))
             }
-        }
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
-                    "ALTER TABLE messages ADD COLUMN deterministic_risk_level TEXT NOT NULL DEFAULT 'SAFE'"
-                )
-                database.execSQL(
-                    "ALTER TABLE messages ADD COLUMN matched_indicators TEXT NOT NULL DEFAULT ''"
-                )
-                database.execSQL(
-                    "ALTER TABLE messages ADD COLUMN ai_analysis_status TEXT NOT NULL DEFAULT 'NOT_STARTED'"
-                )
-                database.execSQL(
-                    "ALTER TABLE messages ADD COLUMN processing_state TEXT NOT NULL DEFAULT 'COMPLETED'"
-                )
-                database.execSQL(
-                    "ALTER TABLE messages ADD COLUMN final_classification TEXT NOT NULL DEFAULT 'SAFE'"
-                )
+            val finalClassificationMissing = "final_classification" !in columns
+            val additions = mapOf(
+                "sender_address" to "TEXT",
+                "deterministic_risk_level" to "TEXT NOT NULL DEFAULT 'SAFE'",
+                "matched_indicators" to "TEXT NOT NULL DEFAULT ''",
+                "ai_analysis_status" to "TEXT NOT NULL DEFAULT 'NOT_STARTED'",
+                "processing_state" to "TEXT NOT NULL DEFAULT 'COMPLETED'",
+                "final_classification" to "TEXT NOT NULL DEFAULT 'SAFE'"
+            )
+            additions.forEach { (column, definition) ->
+                if (column !in columns) {
+                    database.execSQL("ALTER TABLE messages ADD COLUMN $column $definition")
+                }
+            }
+            if (finalClassificationMissing) {
                 database.execSQL(
                     """
                     UPDATE messages
@@ -86,5 +75,32 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+
+        private val MIGRATION_1_3 = object : Migration(1, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) = addMissingMessageColumns(database)
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) = addMissingMessageColumns(database)
+        }
+
+        // Singleton instance — only one database connection across the app
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getInstance(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "kasds_database"
+                )
+                    .addMigrations(MIGRATION_1_3, MIGRATION_2_3)
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+
     }
 }

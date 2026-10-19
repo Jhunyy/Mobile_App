@@ -1,132 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+
+<com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp">
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="@color/surface"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="8dp">
 
-    <!-- Warning icon and title -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
         android:orientation="vertical"
-        android:paddingBottom="16dp">
+        android:paddingStart="22dp"
+        android:paddingTop="30dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="20dp">
 
+        <!-- Warning icon -->
         <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center_horizontal"
             android:src="@drawable/ic_warning"
-            android:tint="@color/color_scam" />
+            app:tint="@color/color_scam" />
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:gravity="center"
+            android:text="Suspicious Message Detected!"
+            android:textColor="@color/text_primary"
+            android:textSize="21sp" />
+
+
+        <!-- ================================================= -->
+        <!-- HIDDEN DATA -->
+        <!-- IDs retained so existing Kotlin does not break -->
+        <!-- ================================================= -->
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Suspicious Message Detected!"
-            android:textColor="@color/color_scam"
+            android:id="@+id/text_alert_risk_score"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/text_alert_keywords"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_alert_gemma"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/text_alert_gemma_rationale"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/text_alert_gemma_confidence"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+
+        <!-- Report -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_alert_report"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="28dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Report"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
             android:textSize="17sp"
-            android:textStyle="bold" />
+            app:backgroundTint="@color/color_scam"
+            app:cornerRadius="28dp" />
+
+
+        <!-- Delete -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_alert_delete"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Delete"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="17sp"
+            app:backgroundTint="@color/button_dark"
+            app:cornerRadius="28dp" />
+
+
+        <!-- Ignore -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_alert_ignore"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/dm_sans_bold"
+            android:text="Ignore"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp"
+            app:backgroundTint="#E4E4E4"
+            app:cornerRadius="28dp" />
 
     </LinearLayout>
 
-    <!-- Divider -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/divider"
-        android:layout_marginBottom="12dp"/>
-
-    <!-- Risk score -->
-    <TextView
-        android:id="@+id/text_alert_risk_score"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
-
-    <!-- Detected keywords -->
-    <TextView
-        android:id="@+id/text_alert_keywords"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
-
-    <!-- Gemma rationale -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/card_alert_gemma"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:visibility="gone"
-        app:cardBackgroundColor="@color/color_suspicious_bg"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="0dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="AI Analysis"
-                android:textColor="@color/color_suspicious"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/text_alert_gemma_rationale"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/text_alert_gemma_confidence"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- Action buttons -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_alert_report"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:text="Report Message"
-        app:backgroundTint="@color/color_scam"
-        app:cornerRadius="8dp" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_alert_delete"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:text="Delete Message"
-        app:cornerRadius="8dp"
-        app:strokeColor="@color/color_scam" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_alert_ignore"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Ignore"
-        app:cornerRadius="8dp" />
-
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

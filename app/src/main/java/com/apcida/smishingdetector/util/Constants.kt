@@ -60,4 +60,6 @@ object Constants {
     const val PREFS_NAME = "kasds_prefs"
     const val PREF_IS_FIRST_LAUNCH = "is_first_launch"
     const val PREF_SMS_PERMISSION_GRANTED = "sms_permission_granted"
+    const val PREF_CONTACT_NAMES_ENABLED = "contact_names_enabled"
+    const val PREF_CONTACT_PROMPT_SHOWN = "contact_prompt_shown"
 }

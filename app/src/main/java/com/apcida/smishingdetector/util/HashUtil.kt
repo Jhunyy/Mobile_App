@@ -20,7 +20,8 @@ object HashUtil {
 
     /**
      * Generates a hash of the sender string for privacy protection.
-     * Raw phone numbers are never stored — only their hash.
+     * The hash remains available for comparisons; new messages also keep the
+     * sender address locally so the inbox can display it.
      */
     fun hashSender(sender: String): String {
         return sha256(sender.trim())
@@ -28,7 +29,7 @@ object HashUtil {
 
     /**
      * Generates a hash of the message content.
-     * Used to detect and skip duplicate incoming messages.
+     * Identifies repeated content without skipping analysis of incoming messages.
      */
     fun hashContent(content: String): String {
         return sha256(content.trim())
