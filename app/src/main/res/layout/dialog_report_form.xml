@@ -7,10 +7,18 @@
     android:padding="20dp">
 
     <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="Optional: report this message if it was not scanned or the result seems wrong."
+        android:textColor="#424242"
+        android:textSize="14sp" />
+
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="Reason for reporting:"
+        android:text="What went wrong?"
         android:textColor="#212121"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -33,7 +41,7 @@
         android:id="@+id/input_remarks"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Describe what made this message suspicious..."
+        android:hint="What result did you expect?"
         android:inputType="textMultiLine"
         android:lines="3"
         android:maxLines="5"

@@ -1,8 +1,25 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val reportBaseUrl = System.getenv("APCIDA_REPORT_BASE_URL")
+    ?: localProperties.getProperty("apcida.reportBaseUrl")
+    ?: "https://apcida-server.onrender.com/api/"
+val reportApiKey = System.getenv("APCIDA_REPORT_API_KEY")
+    ?: localProperties.getProperty("apcida.reportApiKey")
+    ?: ""
 
 android {
     namespace = "com.apcida.smishingdetector"
@@ -15,6 +32,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "REPORT_BASE_URL", buildConfigString(reportBaseUrl))
+        buildConfigField("String", "REPORT_API_KEY", buildConfigString(reportApiKey))
     }
 
     buildTypes {
@@ -38,6 +57,7 @@ android {
 
     buildFeatures {
         viewBinding = true  // enables ViewBinding for XML layouts
+        buildConfig = true
     }
 
     testOptions {

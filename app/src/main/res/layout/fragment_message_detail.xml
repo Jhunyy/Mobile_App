@@ -137,7 +137,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:backgroundTint="@color/color_scam"
-                android:text="Report Message"
+                android:text="Report a Scan Issue"
                 android:textColor="@color/white" />
 
             <Button

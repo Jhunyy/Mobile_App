@@ -64,7 +64,7 @@ Database: Room / SQLite
 Minimum SDK: 29  
 Target SDK: 36  
 LLM runtime: MediaPipe LLM Inference API  
-MediaPipe version: `0.10.20`
+MediaPipe version: `0.10.35`
 
 ```text
 app/src/main/java/com/apcida/smishingdetector/
@@ -89,6 +89,7 @@ app/src/main/java/com/apcida/smishingdetector/
 |   +-- database/        AppDatabase, DatabaseSeeder, DAOs
 |   +-- repository/      Message, Keyword, Report, Safety Tip repositories
 |   +-- network/         ReportApiService, ReportUploadManager
+|   +-- worker/          SmsProcessingWorker, ReportUploadWorker
 |
 +-- util/
     +-- Constants, DateUtil, HashUtil, PermissionHelper
@@ -111,6 +112,7 @@ app/src/main/java/com/apcida/smishingdetector/
 | `AppDatabase.kt` | Room database with entities for messages, keywords, reports, safety tips, and message-keyword links. |
 | `DatabaseSeeder.kt` | Seeds keywords and safety tips from XML assets on first launch. |
 | `ReportUploadManager.kt` | Uploads unsent reports when internet is available. |
+| `ReportUploadWorker.kt` | Persists report uploads and retries them when connected. |
 
 ## Gemma Model Setup
 
@@ -174,16 +176,17 @@ This validates that the report request came from an authorized app client. It do
 
 Prototype limitation: because the shared API key is packaged with the Android app, it could be extracted from the APK by a skilled attacker. This is acceptable for the thesis prototype if documented, but a production system should use stronger authentication.
 
-The Android client keeps report uploads pending until both values are configured:
+The Android client uses the hosted API URL by default and keeps report uploads
+pending until the reporting key is supplied through the ignored root
+`local.properties` file or the `APCIDA_REPORT_API_KEY` environment variable:
 
-```kotlin
-const val BASE_URL = "https://your-report-server.com/api/"
-const val REPORT_API_KEY = ""
+```properties
+apcida.reportApiKey=<same key configured on the deployed server>
 ```
 
 Recommended hosting approach:
 
-1. Render or Railway with Node/Express and hosted Postgres. Best default for this thesis prototype because it is simple to deploy from GitHub, matches the Android Retrofit REST client, and provides enough database support for flagged-message reports.
+1. Render or Railway with Node/Express and hosted Postgres. Best default for this thesis prototype because it is simple to deploy from GitHub, matches the Android Retrofit REST client, and provides enough database support for optional scan feedback.
 2. Firebase Cloud Functions with Firestore. Good if the team wants less server management, but it adds Firebase-specific tooling and data modeling.
 3. University VPS or on-campus server. Academically nice if MSU-IIT can provide quick access and setup support.
 4. Self-managed VPS. More control, but more work than needed for a defense-scope report endpoint.
@@ -208,16 +211,10 @@ Server responsibilities:
 
 Current Android retry behavior:
 
-- `ReportUploadManager` attempts uploads on app startup.
-- `ReportUploadManager` attempts uploads immediately after a user submits a report.
-- If the device is offline, the server URL is still a placeholder, or the API key is empty, reports stay pending in Room.
-
-Planned retry improvement:
-
-- Add Android WorkManager.
-- Schedule a report upload worker after report submission.
-- Use a network constraint so the worker runs only when internet is available.
-- Keep failed reports pending for later retry.
+- `ReportUploadWorker` is scheduled on app startup, after a report is saved, and when the Reports screen opens.
+- WorkManager waits for a network connection and retries temporary failures.
+- `ReportUploadManager` marks a local report Sent only after the server returns success and a report ID, including when the server acknowledges an already received duplicate.
+- If the device is offline or the API key is empty, reports stay Pending in Room.
 
 ## What I Like About This Project
 
@@ -231,8 +228,8 @@ Planned retry improvement:
 
 These are based on the current repository state:
 
-- `BASE_URL` is still the placeholder `https://your-report-server.com/api/`.
-- `REPORT_API_KEY` is still empty until the report server secret is finalized.
+- The default `BASE_URL` is `https://apcida-server.onrender.com/api/`.
+- `REPORT_API_KEY` is empty in builds without a local or CI reporting key.
 
 ## Near-Term Roadmap
 
@@ -244,7 +241,7 @@ These are based on the current repository state:
 - Make Gemma loading shared or injectable so SMS processing uses the loaded model. Done.
 - Implement notification display for scam results. Done.
 - Connect report submission from the detail/report form flow to `ReportUploadManager`. Done.
-- Add WorkManager-based automatic retry for pending report uploads.
+- Add WorkManager-based automatic retry for pending report uploads. Done.
 - Rename `OnboardingActivity` to `OnboardingFragment` for clearer navigation structure. Done.
 - Remove unused `SplashActivity` placeholder and keep `MainActivity` as launcher. Done.
 - Run full pipeline testing: receive SMS -> keyword match -> risk score -> Gemma validation -> saved result -> alert/report.
@@ -288,8 +285,9 @@ Use this when an Android phone is available:
 
 Use this when the separate report server is ready:
 
-- Replace `BASE_URL` with the server API base URL.
-- Set `REPORT_API_KEY` to the agreed shared secret for the prototype.
+- Confirm the hosted API responds at `https://apcida-server.onrender.com/health`.
+- Put the deployed server's reporting key in ignored `local.properties` as
+  `apcida.reportApiKey`, or provide `APCIDA_REPORT_API_KEY` in the build environment.
 - Make the server require `X-API-Key` and `X-Timestamp` headers.
 - Reject requests with an invalid key or stale timestamp.
 - Confirm the server stores only anonymized report metadata.

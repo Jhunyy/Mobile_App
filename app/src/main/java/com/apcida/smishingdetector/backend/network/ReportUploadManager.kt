@@ -10,6 +10,7 @@ import com.apcida.smishingdetector.backend.repository.KeywordRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.util.Constants
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,7 +23,7 @@ class ReportUploadManager(private val context: Context) {
 
     companion object {
         private const val TAG = "ReportUploadManager"
-        private const val TIMEOUT_SECONDS = 30L
+        private const val TIMEOUT_SECONDS = 90L
     }
 
     private val database = AppDatabase.getInstance(context)
@@ -40,34 +41,33 @@ class ReportUploadManager(private val context: Context) {
      *
      * Call this:
      * - On app startup
-     * - When internet connectivity is restored
      * - After a new report is submitted
      */
-    suspend fun uploadPendingReports() {
-        withContext(Dispatchers.IO) {
-            if (!isInternetAvailable()) {
-                Log.d(TAG, "No internet connection. Skipping upload.")
-                return@withContext
-            }
+    suspend fun uploadPendingReports(): Boolean = withContext(Dispatchers.IO) {
+        val unsentReports = reportRepository.getUnsentReports()
 
-            if (!isReportServerConfigured()) {
-                Log.w(TAG, "Report server is not configured. Leaving reports pending.")
-                return@withContext
-            }
-
-            val unsentReports = reportRepository.getUnsentReports()
-
-            if (unsentReports.isEmpty()) {
-                Log.d(TAG, "No pending reports to upload.")
-                return@withContext
-            }
-
-            Log.d(TAG, "Found ${unsentReports.size} unsent report(s). Uploading...")
-
-            for (report in unsentReports) {
-                uploadSingleReport(report)
-            }
+        if (unsentReports.isEmpty()) {
+            Log.d(TAG, "No pending reports to upload.")
+            return@withContext true
         }
+
+        if (!isInternetAvailable()) {
+            Log.d(TAG, "No internet connection. Skipping upload.")
+            return@withContext false
+        }
+
+        if (!isReportServerConfigured()) {
+            Log.w(TAG, "Report server is not configured. Leaving reports pending.")
+            return@withContext false
+        }
+
+        Log.d(TAG, "Found ${unsentReports.size} unsent report(s). Uploading...")
+
+        for (report in unsentReports) {
+            uploadSingleReport(report)
+        }
+
+        return@withContext reportRepository.getUnsentReportCount() == 0
     }
 
     /**
@@ -98,7 +98,10 @@ class ReportUploadManager(private val context: Context) {
                 report = payload
             )
 
-            if (response.isSuccessful) {
+            if (response.isSuccessful &&
+                response.body()?.success == true &&
+                !response.body()?.reportId.isNullOrBlank()
+            ) {
                 reportRepository.markReportAsSent(report.reportId)
                 Log.d(TAG, "Report ${report.reportId} uploaded successfully.")
             } else {
@@ -109,6 +112,8 @@ class ReportUploadManager(private val context: Context) {
                 )
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error uploading report ${report.reportId}: ${e.message}")
             // Report stays as is_sent = false for retry on next attempt
@@ -128,6 +133,8 @@ class ReportUploadManager(private val context: Context) {
             messageKeywords.mapNotNull { mk ->
                 mk.matchedText
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Could not fetch keywords for message $messageId: ${e.message}")
             emptyList()
@@ -152,7 +159,8 @@ class ReportUploadManager(private val context: Context) {
     }
 
     private fun isReportServerConfigured(): Boolean {
-        return Constants.BASE_URL != "https://your-report-server.com/api/" &&
+        return Constants.BASE_URL.startsWith("https://") &&
+                Constants.BASE_URL.endsWith("/") &&
                 Constants.REPORT_API_KEY.isNotBlank()
     }
 

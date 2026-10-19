@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.repository.ReportRepository
+import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.databinding.FragmentReportLogsBinding
 import com.apcida.smishingdetector.view.adapter.ReportLogAdapter
 import kotlinx.coroutines.flow.collectLatest
@@ -37,6 +38,11 @@ class ReportLogsFragment : Fragment() {
         setupRepository()
         setupRecyclerView()
         observeReports()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ReportUploadWorker.enqueue(requireContext().applicationContext)
     }
 
     private fun setupRepository() {

@@ -12,7 +12,7 @@ import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
-import com.apcida.smishingdetector.backend.network.ReportUploadManager
+import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.view.fragment.OnboardingFragment
@@ -28,9 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var navController: NavController
-    private val reportUploadManager by lazy {
-        ReportUploadManager(applicationContext)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigation()
         seedDatabase()
         loadGemmaModel()
-        uploadPendingReports()
+        ReportUploadWorker.enqueue(applicationContext)
         requestRequiredPermissions()
     }
 
@@ -72,16 +69,6 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "Gemma model loaded.")
             } catch (e: Exception) {
                 Log.e(TAG, "Gemma model load failed: ${e.message}")
-            }
-        }
-    }
-
-    private fun uploadPendingReports() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                reportUploadManager.uploadPendingReports()
-            } catch (e: Exception) {
-                Log.e(TAG, "Report upload failed: ${e.message}")
             }
         }
     }

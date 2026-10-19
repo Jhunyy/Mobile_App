@@ -58,7 +58,8 @@ app/src/main/java/com/apcida/smishingdetector/
 │   ├── receiver/                 # SmsReceiver (BroadcastReceiver)
 │   ├── repository/               # CRUD repositories for each Room entity
 │   ├── database/                 # AppDatabase, DatabaseSeeder
-│   └── network/                  # ReportApiService, ReportUploadManager
+│   ├── network/                  # ReportApiService, ReportUploadManager
+│   └── worker/                   # Persistent SMS analysis and report upload
 │
 └── util/                         # Constants, HashUtil, PermissionHelper, DateUtil
 ```
@@ -77,7 +78,8 @@ app/src/main/java/com/apcida/smishingdetector/
 | `PromptBuilder.kt` | Builds the structured prompt (system instruction + message + keywords) |
 | `GemmaOutputParser.kt` | Parses Gemma's output into classification, confidence, and reason |
 | `DatabaseSeeder.kt` | Seeds the keyword/pattern/tip tables from XML on first launch |
-| `ReportUploadManager.kt` | Queues and retries report uploads when connectivity is available |
+| `ReportUploadManager.kt` | Sends pending reports and marks server-acknowledged reports as sent |
+| `ReportUploadWorker.kt` | Retries pending report uploads with a network constraint |
 
 ## Setup
 
@@ -93,7 +95,7 @@ kapt "androidx.room:room-compiler:2.6.1"
 implementation "androidx.room:room-ktx:2.6.1"
 
 // MediaPipe LLM Inference (Gemma)
-implementation "com.google.mediapipe:tasks-genai:0.10.20"
+implementation "com.google.mediapipe:tasks-genai:0.10.35"
 
 // Networking (report upload)
 implementation "com.squareup.retrofit2:retrofit:2.9.0"
@@ -118,6 +120,26 @@ implementation "androidx.navigation:navigation-ui-ktx:2.7.6"
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 ```
 
+### Send test SMS messages from Terminal (Android Emulator)
+
+Start the `Medium_Phone` emulator, open KA-SDS, and grant its SMS permissions.
+Then paste these commands into a Mac Terminal:
+
+```bash
+cd ~/Documents/apcida/Mobile_App
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"
+"$ADB" devices
+"$ADB" -s emulator-5554 emu sms send 6505550100 "See you tomorrow at 3 pm."
+"$ADB" -s emulator-5554 emu sms send 6505550100 "Urgent: verify your bank account at https://example.com/test"
+```
+
+The sender number is a test value. Open the app's **Messages** tab to confirm
+the messages arrived. If `adb devices` shows a different
+emulator ID, replace `emulator-5554` in the commands. Change the message text
+when repeating a test because the app suppresses recent duplicates. This
+command works with an Android emulator; a physical phone needs a real incoming
+SMS. See the [Android emulator SMS command documentation](https://developer.android.com/studio/run/emulator-console).
+
 ### Gemma Model
 This project uses **Gemma 3 1B IT (INT4)**. Push the `.task` model file to a physical device via ADB rather than bundling it in `assets/`:
 
@@ -138,7 +160,20 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 
 ## Report Server Plan
 
-Report collection is handled by a separate server, not by the Android app itself. When a user submits a report, the app sends anonymized report metadata to the configured `BASE_URL` over HTTPS.
+Report collection is handled by a separate server, not by the Android app itself. Reporting is optional feedback for a saved message that was not scanned or whose scan result seems wrong. The report button is available for safe and flagged messages. Only after the user submits the form does the app send anonymized report metadata to the configured `BASE_URL` over HTTPS.
+
+The default reporting API base URL is `https://apcida-server.onrender.com/api/`.
+To enable uploads in a local Android build, add the key configured on the
+deployed server to the ignored root `local.properties` file:
+
+```properties
+apcida.reportApiKey=<same key configured on the deployed server>
+```
+
+For CI, use the `APCIDA_REPORT_API_KEY` environment variable instead. The
+optional `apcida.reportBaseUrl` property or `APCIDA_REPORT_BASE_URL` environment
+variable can override the default URL; the URL must end in `/api/`. If no key
+is supplied, reports remain pending on the device. Do not commit the key.
 
 For the thesis prototype, report submissions should be authenticated with a shared API key and timestamp:
 
@@ -149,9 +184,9 @@ X-Timestamp: <request timestamp>
 
 The server checks the API key and rejects stale timestamps before accepting the report. This validates that the report request came from an authorized app client, while the SMS detection decision itself still comes from the on-device keyword and Gemma pipeline.
 
-Recommended hosting for the prototype: **Render or Railway with a small Node/Express REST API and hosted Postgres**. This keeps deployment simple, works naturally with Retrofit, and is enough for accepting flagged-message reports during thesis evaluation. Firebase Cloud Functions + Firestore is a reasonable second option if the team wants less server management, while a university VPS is useful only if access and setup support are readily available.
+Recommended hosting for the prototype: **Render or Railway with a small Node/Express REST API and hosted Postgres**. This keeps deployment simple, works naturally with Retrofit, and is enough for accepting optional scan feedback during thesis evaluation. Firebase Cloud Functions + Firestore is a reasonable second option if the team wants less server management, while a university VPS is useful only if access and setup support are readily available.
 
-Current retry behavior is simple: the app attempts to upload pending reports on app startup and immediately after a report is submitted. If the device is offline or the server is not configured, reports remain pending in Room. The planned improvement is to use Android WorkManager with a network constraint so pending reports automatically retry when internet becomes available.
+Report uploads use WorkManager with a network constraint and retry after temporary failures. The app schedules an attempt on startup, after report submission, and when the Reports screen opens. A report stays Pending until the server acknowledges it with `success: true` and a report ID; then the local row changes to Sent. If the server stored a report but the app lost the response, the retry sends the same payload and the server returns its existing report ID. The request timeout is 90 seconds to allow the free server to wake from idle. Builds without a reporting key leave reports Pending.
 
 ## Roadmap
 
@@ -160,6 +195,6 @@ Current retry behavior is simple: the app attempts to upload pending reports on 
 - [x] Core UI: message list, detail view, alert dialogs
 - [x] Gemma integration (Stage 2 on-device validation)
 - [ ] Report submission + upload manager polish
-- [ ] WorkManager-based automatic report retry
+- [x] WorkManager-based automatic report retry
 - [ ] Safety tips screen + UI polish
 - [ ] Full pipeline testing and user evaluation

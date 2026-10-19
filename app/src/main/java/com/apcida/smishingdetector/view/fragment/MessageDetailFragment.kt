@@ -10,7 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
-import com.apcida.smishingdetector.backend.network.ReportUploadManager
+import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
@@ -30,7 +30,6 @@ class MessageDetailFragment : Fragment() {
 
     private lateinit var messageRepository: MessageRepository
     private lateinit var reportRepository: ReportRepository
-    private lateinit var reportUploadManager: ReportUploadManager
     private var currentMessage: Message? = null
 
     override fun onCreateView(
@@ -58,7 +57,6 @@ class MessageDetailFragment : Fragment() {
         val database = AppDatabase.getInstance(requireContext())
         messageRepository = MessageRepository(database.messageDao())
         reportRepository = ReportRepository(database.reportDao())
-        reportUploadManager = ReportUploadManager(requireContext().applicationContext)
     }
 
     private fun loadMessage(messageId: Long) {
@@ -123,8 +121,8 @@ class MessageDetailFragment : Fragment() {
                 cardGemmaAnalysis.visibility = View.GONE
             }
 
-            // Show report button only for flagged messages
-            btnReport.visibility = if (message.isFlagged) View.VISIBLE else View.GONE
+            // Any saved message can receive optional feedback about its scan.
+            btnReport.visibility = View.VISIBLE
         }
     }
 
@@ -182,12 +180,12 @@ class MessageDetailFragment : Fragment() {
                 isSent = false
             )
             reportRepository.insertReport(report)
+            ReportUploadWorker.enqueue(requireContext().applicationContext)
             Toast.makeText(
                 requireContext(),
                 "Report saved. Upload will run when the server is available.",
                 Toast.LENGTH_SHORT
             ).show()
-            reportUploadManager.uploadPendingReports()
         }
     }
 

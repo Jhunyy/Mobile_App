@@ -1,5 +1,7 @@
 package com.apcida.smishingdetector.util
 
+import com.apcida.smishingdetector.BuildConfig
+
 object Constants {
 
     // ── Detection Threshold ──────────────────────────────────────
@@ -32,19 +34,16 @@ object Constants {
     const val CONFIDENCE_MEDIUM = "MEDIUM"
     const val CONFIDENCE_LOW = "LOW"
 
-    // ── Report Types ─────────────────────────────────────────────
-    const val REPORT_PHISHING_LINK = "Phishing Link (Fake Login Page)"
-    const val REPORT_SUSPICIOUS_URL = "Suspicious or Malicious URL"
-    const val REPORT_SHORTENED_URL = "Shortened or Masked URL"
-    const val REPORT_DELIVERY_SCAM = "Delivery/Parcel Scam Link"
-    const val REPORT_URGENT_MESSAGE = "Urgent or Threatening Message"
-    const val REPORT_OTHER = "Others"
+    // ── Optional detection feedback ────────────────────────────
+    const val REPORT_NOT_SCANNED = "Message was not scanned"
+    const val REPORT_MISSED_SCAM = "Scam was not detected"
+    const val REPORT_FALSE_ALERT = "Legitimate message was flagged"
+    const val REPORT_OTHER = "Other detection issue"
 
     // ── Network ──────────────────────────────────────────────────
-    // Replace with your actual server URL when ready
-    const val BASE_URL = "https://your-report-server.com/api/"
+    val BASE_URL = BuildConfig.REPORT_BASE_URL
     const val REPORT_ENDPOINT = "reports/submit"
-    const val REPORT_API_KEY = ""
+    val REPORT_API_KEY = BuildConfig.REPORT_API_KEY
     const val REPORT_API_KEY_HEADER = "X-API-Key"
     const val REPORT_TIMESTAMP_HEADER = "X-Timestamp"
 
