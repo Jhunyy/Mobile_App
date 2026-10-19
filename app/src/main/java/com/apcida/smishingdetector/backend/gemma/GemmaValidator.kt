@@ -6,8 +6,6 @@ import com.apcida.smishingdetector.model.data.GemmaResult
 import com.apcida.smishingdetector.util.Constants
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -18,33 +16,19 @@ class GemmaValidator(private val context: Context) {
         private const val MODEL_FILE_NAME = "gemma3-1b-it-int4.task"
     }
 
+    private val modelLock = Any()
+
     private var llmInference: LlmInference? = null
     private var isModelLoaded = false
-    private val inferenceMutex = Mutex()
 
     /**
-     * Detects if the app is running on an Android emulator.
-     * Gemma via MediaPipe requires a physical device.
-     */
-    private fun isEmulator(): Boolean {
-        return (android.os.Build.FINGERPRINT.startsWith("generic")
-                || android.os.Build.FINGERPRINT.startsWith("unknown")
-                || android.os.Build.MODEL.contains("google_sdk")
-                || android.os.Build.MODEL.contains("Emulator")
-                || android.os.Build.MODEL.contains("Android SDK built for x86")
-                || android.os.Build.MANUFACTURER.contains("Genymotion")
-                || android.os.Build.BRAND.startsWith("generic")
-                || android.os.Build.DEVICE.startsWith("generic"))
-    }
-
-    /**
-     * Validates a flagged SMS message using Gemma.
+     * Validates every SMS message using Gemma, loading the model on demand.
      *
      * Builds a structured prompt from the message and
      * detected keywords, runs inference, then parses
      * the output into a GemmaResult.
      *
-     * Returns a fallback result if the model is not loaded
+     * Returns a fallback result if the model cannot be loaded
      * or if inference fails.
      */
     suspend fun validate(
@@ -52,11 +36,12 @@ class GemmaValidator(private val context: Context) {
         matchedKeywords: List<String>
     ): GemmaResult {
         return withContext(Dispatchers.IO) {
-            inferenceMutex.withLock {
+            synchronized(modelLock) {
                 try {
-                    if (!isModelLoaded || llmInference == null) {
+                    loadModelLocked()
+                    if (llmInference == null) {
                         Log.w(TAG, "Gemma model not loaded. Returning fallback result.")
-                        return@withLock GemmaResult.fallback()
+                        return@synchronized GemmaResult.fallback()
                     }
 
                     // Build structured prompt
@@ -65,13 +50,19 @@ class GemmaValidator(private val context: Context) {
 
                     // Run inference
                     val rawOutput = llmInference!!.generateResponse(prompt)
+                    Log.d(TAG, "Gemma inference completed")
 
-                    // Strict parsing validates supported labels, confidence,
-                    // rationale presence, and rejects all additional output.
+                    // Validate output format
+                    if (!GemmaOutputParser.isValidFormat(rawOutput)) {
+                        Log.w(TAG, "Gemma output format is invalid. Returning fallback.")
+                        return@synchronized GemmaResult.fallback()
+                    }
+
+                    // Parse and return structured result
                     GemmaOutputParser.parse(rawOutput)
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "Gemma inference failed: ${e.message}")
+                    Log.e(TAG, "Gemma inference failed", e)
                     GemmaResult.fallback()
                 }
             }
@@ -81,86 +72,69 @@ class GemmaValidator(private val context: Context) {
     /**
      * Returns the preferred local file path for the Gemma model.
      */
-    private fun getModelFile(): File {
-        // Primary location — internal app storage (after first copy)
+    private fun getModelFile(): File? {
+        // The model can be installed into app storage or pushed to the device with adb.
         val internalFile = File(context.filesDir, MODEL_FILE_NAME)
-        if (internalFile.exists()) return internalFile
+        if (internalFile.isFile && internalFile.canRead()) return internalFile
 
-        // Secondary location — where adb push placed the model
         val adbFile = File("/data/local/tmp/llm/$MODEL_FILE_NAME")
-        if (adbFile.exists()) return adbFile
+        if (adbFile.isFile && adbFile.canRead()) return adbFile
 
-        return internalFile
+        return null
     }
+
     /**
      * Loads the Gemma 3 1B INT4 model from internal storage or the adb push path.
      * Model loading is heavy, so this runs on the IO dispatcher.
      */
-    suspend fun loadModel() {
-        withContext(Dispatchers.IO) {
-            try {
-                if (isModelLoaded && llmInference != null) {
-                    Log.d(TAG, "Gemma model is already loaded.")
-                    return@withContext
-                }
-
-                if (isEmulator()) {
-                    Log.w(TAG, "Emulator detected. Skipping Gemma.")
-                    isModelLoaded = false
-                    return@withContext
-                }
-
-                Log.d(TAG, "Loading Gemma model...")
-                val modelFile = getModelFile()
-
-                if (!modelFile.exists()) {
-                    // Try copying from adb push location
-                    val adbFile = File("/data/local/tmp/llm/$MODEL_FILE_NAME")
-                    if (adbFile.exists()) {
-                        Log.d(TAG, "Found model in /data/local/tmp/llm/. Copying...")
-                        copyModelFile(adbFile, modelFile)
-                    } else {
-                        Log.e(TAG, "Model file not found on device.")
-                        isModelLoaded = false
-                        return@withContext
-                    }
-                }
-
-                val options = LlmInference.LlmInferenceOptions.builder()
-                    .setModelPath(modelFile.absolutePath)
-                    .setMaxTokens(Constants.GEMMA_MAX_TOKENS)
-                    //.setTemperature(Constants.GEMMA_TEMPERATURE)
-                    //.setTopK(40)
-                    //.setRandomSeed(42)
-                    .build()
-
-                llmInference = LlmInference.createFromOptions(context, options)
-                isModelLoaded = true
-                Log.d(TAG, "Gemma model loaded successfully.")
-
-            } catch (e: UnsatisfiedLinkError) {
-                Log.e(TAG, "MediaPipe native library not found. Requires physical device.")
-                isModelLoaded = false
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load Gemma model: ${e.message}")
-                isModelLoaded = false
+    suspend fun loadModel(): Boolean {
+        return withContext(Dispatchers.IO) {
+            synchronized(modelLock) {
+                loadModelLocked()
+                isModelLoaded
             }
         }
     }
-    private fun copyModelFile(source: File, destination: File) {
+
+    // Loading, inference, and release share a lock so overlapping SMS cannot
+    // use or close the same native model at the same time.
+    private fun loadModelLocked() {
         try {
-            source.inputStream().use { input ->
-                destination.outputStream().use { output ->
-                    val buffer = ByteArray(4096)
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                    }
-                }
+            if (isModelLoaded && llmInference != null) {
+                Log.d(TAG, "Gemma model is already loaded.")
+                return
             }
-            Log.d(TAG, "Model copied to: ${destination.absolutePath}")
+
+            Log.d(TAG, "Loading Gemma model...")
+            val modelFile = getModelFile()
+
+            if (modelFile == null) {
+                Log.e(TAG, "Readable model not found. Expected $MODEL_FILE_NAME in ${context.filesDir} or /data/local/tmp/llm/")
+                isModelLoaded = false
+                return
+            }
+
+            val options = LlmInference.LlmInferenceOptions.builder()
+                .setModelPath(modelFile.absolutePath)
+
+                // MediaPipe counts prompt and response tokens together.
+                .setMaxTokens(Constants.GEMMA_MAX_TOKENS)
+
+                // CPU is generally the safer compatibility test on different Android GPUs.
+                .setPreferredBackend(LlmInference.Backend.CPU)
+
+                .build()
+
+            llmInference = LlmInference.createFromOptions(context, options)
+            isModelLoaded = true
+            Log.d(TAG, "Gemma model loaded successfully.")
+
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "MediaPipe native library could not be loaded", e)
+            isModelLoaded = false
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy model: ${e.message}")
+            Log.e(TAG, "Failed to load Gemma model", e)
+            isModelLoaded = false
         }
     }
 
@@ -169,7 +143,7 @@ class GemmaValidator(private val context: Context) {
      * Call this when the app is destroyed or when
      * the model is no longer needed.
      */
-    fun release() {
+    fun release(): Unit = synchronized(modelLock) {
         llmInference?.close()
         llmInference = null
         isModelLoaded = false
@@ -179,5 +153,5 @@ class GemmaValidator(private val context: Context) {
     /**
      * Returns whether the model is currently loaded and ready.
      */
-    fun isReady(): Boolean = isModelLoaded
+    fun isReady(): Boolean = synchronized(modelLock) { isModelLoaded }
 }

@@ -14,6 +14,7 @@ import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
+import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.view.fragment.OnboardingFragment
@@ -39,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigation()
         seedDatabase()
         loadGemmaModel()
+        recoverOrphanedAiWork()
         ReportUploadWorker.enqueue(applicationContext)
         requestRequiredPermissions()
     }
@@ -128,6 +130,16 @@ class MainActivity : AppCompatActivity() {
                     TAG,
                     "Gemma model load failed: ${e.message}"
                 )
+            }
+        }
+    }
+
+    private fun recoverOrphanedAiWork() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                SmsProcessingWorker.recoverOrphaned(applicationContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to recover pending AI analysis.", e)
             }
         }
     }

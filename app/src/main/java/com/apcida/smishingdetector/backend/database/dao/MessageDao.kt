@@ -39,6 +39,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     fun observeMessageById(messageId: Long): Flow<Message?>
 
+    @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before")
+    suspend fun getStaleAiMessageIds(before: Long): List<Long>
+
     // Suppress duplicate broadcasts only for the same sender/content in a
     // bounded window. A legitimate repeated SMS outside the window is kept.
     @Query(
