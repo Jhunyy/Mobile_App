@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<LinearLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+<LinearLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -15,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fontFamily="@font/dm_sans_regular"
-        android:text="Optional: report this message if it was not scanned or the result seems wrong."
+        android:text="Tell us if the scan did not finish or its result seems wrong."
         android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
@@ -71,10 +76,33 @@
         android:hint="What result did you expect?"
         android:inputType="textCapSentences|textMultiLine"
         android:maxLines="5"
+        android:maxLength="1000"
         android:padding="16dp"
         android:textColor="@color/text_primary"
         android:textColorHint="@color/text_secondary"
         android:textSize="14sp" />
+
+    <CheckBox
+        android:id="@+id/checkbox_share_sms"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:buttonTint="@color/primary"
+        android:checked="false"
+        android:text="Include this SMS text in the report sent to the server. It may contain personal details and stays in the report if you delete the message."
+        android:textColor="@color/text_primary" />
+
+    <TextView
+        android:id="@+id/text_sms_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_report_input"
+        android:padding="12dp"
+        android:textColor="@color/text_primary"
+        android:textIsSelectable="true"
+        android:textSize="13sp"
+        android:visibility="gone" />
 
     <!-- Buttons -->
     <LinearLayout
@@ -115,3 +143,4 @@
     </LinearLayout>
 
 </LinearLayout>
+</ScrollView>

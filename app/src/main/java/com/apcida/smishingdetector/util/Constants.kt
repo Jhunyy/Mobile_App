@@ -36,6 +36,7 @@ object Constants {
 
     // ── Optional detection feedback ────────────────────────────
     const val REPORT_NOT_SCANNED = "Message was not scanned"
+    const val REPORT_ANALYSIS_INCOMPLETE = "Analysis did not complete"
     const val REPORT_MISSED_SCAM = "Scam was not detected"
     const val REPORT_FALSE_ALERT = "Legitimate message was flagged"
     const val REPORT_OTHER = "Other detection issue"

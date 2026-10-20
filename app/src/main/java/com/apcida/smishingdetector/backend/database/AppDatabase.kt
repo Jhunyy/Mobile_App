@@ -25,7 +25,7 @@ import com.apcida.smishingdetector.model.entity.SafetyTip
         Report::class,
         SafetyTip::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -84,6 +84,54 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) = addMissingMessageColumns(database)
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE reports_new (
+                        report_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        message_id INTEGER,
+                        client_report_id TEXT,
+                        report_type TEXT NOT NULL,
+                        remarks TEXT,
+                        risk_score_snapshot REAL,
+                        gemma_classification_snapshot TEXT,
+                        gemma_rationale_snapshot TEXT,
+                        gemma_confidence_snapshot TEXT,
+                        final_verdict_snapshot TEXT,
+                        rule_verdict_snapshot TEXT,
+                        processing_state_snapshot TEXT,
+                        ai_status_snapshot TEXT,
+                        matched_indicators_snapshot TEXT,
+                        sms_text_snapshot TEXT,
+                        app_version_snapshot TEXT,
+                        model_version_snapshot TEXT,
+                        reported_at INTEGER NOT NULL,
+                        is_sent INTEGER NOT NULL,
+                        FOREIGN KEY(message_id) REFERENCES messages(message_id)
+                            ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO reports_new (
+                        report_id, message_id, report_type, remarks, risk_score_snapshot,
+                        gemma_classification_snapshot, gemma_rationale_snapshot,
+                        matched_indicators_snapshot, reported_at, is_sent
+                    )
+                    SELECT report_id, reports.message_id, report_type, remarks, risk_score_snapshot,
+                           gemma_classification_snapshot, gemma_rationale_snapshot,
+                           messages.matched_indicators, reported_at, is_sent
+                    FROM reports LEFT JOIN messages ON reports.message_id = messages.message_id
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE reports")
+                database.execSQL("ALTER TABLE reports_new RENAME TO reports")
+                database.execSQL("CREATE INDEX index_reports_message_id ON reports(message_id)")
+            }
+        }
+
         // Singleton instance — only one database connection across the app
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -95,7 +143,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "kasds_database"
                 )
-                    .addMigrations(MIGRATION_1_3, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_3, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

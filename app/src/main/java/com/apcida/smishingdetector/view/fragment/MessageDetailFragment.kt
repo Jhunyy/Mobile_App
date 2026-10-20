@@ -16,6 +16,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.R
+import com.apcida.smishingdetector.BuildConfig
+import com.apcida.smishingdetector.backend.reporting.ReportSnapshotFactory
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.controller.SmsController
@@ -23,7 +25,6 @@ import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
 import com.apcida.smishingdetector.model.entity.Message
-import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.model.data.AiAnalysisStatus
 import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.util.ContactNameResolver
@@ -358,12 +359,14 @@ class MessageDetailFragment : Fragment() {
 
             onReportSubmitted = {
                     reportType,
-                    remarks ->
+                    remarks,
+                    includeSmsText ->
 
                 submitReport(
                     message = message,
                     reportType = reportType,
-                    remarks = remarks
+                    remarks = remarks,
+                    includeSmsText = includeSmsText
                 )
             }
         )
@@ -377,21 +380,20 @@ class MessageDetailFragment : Fragment() {
     private fun submitReport(
         message: Message,
         reportType: String,
-        remarks: String?
+        remarks: String?,
+        includeSmsText: Boolean
     ) {
+
+        val reportedMessage = currentMessage ?: message
 
         viewLifecycleOwner.lifecycleScope.launch {
 
-            val report = Report(
-                messageId = message.messageId,
+            val report = ReportSnapshotFactory.create(
+                message = reportedMessage,
                 reportType = reportType,
                 remarks = remarks,
-                riskScoreSnapshot = message.riskScore,
-                gemmaClassificationSnapshot =
-                    message.gemmaClassification,
-                gemmaRationaleSnapshot =
-                    message.gemmaRationale,
-                isSent = false
+                includeSmsText = includeSmsText,
+                appVersion = BuildConfig.VERSION_NAME
             )
 
             reportRepository.insertReport(report)

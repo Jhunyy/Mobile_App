@@ -4,9 +4,8 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
+import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.database.AppDatabase
-import com.apcida.smishingdetector.backend.database.dao.MessageKeywordDao
-import com.apcida.smishingdetector.backend.repository.KeywordRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.util.Constants
@@ -28,7 +27,6 @@ class ReportUploadManager(private val context: Context) {
 
     private val database = AppDatabase.getInstance(context)
     private val reportRepository = ReportRepository(database.reportDao())
-    private val keywordRepository = KeywordRepository(database.keywordDao())
 
     // Lazy initialization — only created when needed
     private val apiService: ReportApiService by lazy {
@@ -78,10 +76,15 @@ class ReportUploadManager(private val context: Context) {
      */
     private suspend fun uploadSingleReport(report: Report) {
         try {
-            // Get keyword patterns matched for this message
-            val matchedKeywords = getKeywordsForMessage(report.messageId)
+            val matchedKeywords = report.matchedIndicatorsSnapshot
+                ?.lineSequence()
+                ?.filter { it.isNotBlank() }
+                ?.distinct()
+                ?.take(30)
+                ?.toList()
+                ?: emptyList()
 
-            // Build anonymized payload — no raw SMS content included
+            // Every field comes from the local report snapshot, never the message row.
             val payload = ReportPayload(
                 reportType = report.reportType,
                 remarks = report.remarks,
@@ -89,7 +92,19 @@ class ReportUploadManager(private val context: Context) {
                 gemmaClassification = report.gemmaClassificationSnapshot,
                 gemmaRationale = report.gemmaRationaleSnapshot,
                 detectedKeywords = matchedKeywords,
-                reportedAt = report.reportedAt
+                reportedAt = report.reportedAt,
+                appVersion = report.appVersionSnapshot ?: BuildConfig.VERSION_NAME,
+                clientReportId = report.clientReportId,
+                finalVerdict = report.finalVerdictSnapshot,
+                ruleVerdict = report.ruleVerdictSnapshot,
+                processingState = report.processingStateSnapshot,
+                aiStatus = report.aiStatusSnapshot,
+                gemmaConfidence = report.gemmaConfidenceSnapshot,
+                modelVersion = report.modelVersionSnapshot,
+                smsText = report.smsTextSnapshot,
+                messageSharingConsent = if (report.clientReportId != null) {
+                    report.smsTextSnapshot != null
+                } else null
             )
 
             val response = apiService.submitReport(
@@ -117,27 +132,6 @@ class ReportUploadManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error uploading report ${report.reportId}: ${e.message}")
             // Report stays as is_sent = false for retry on next attempt
-        }
-    }
-
-    /**
-     * Gets the keyword patterns matched for a specific message.
-     * Used to include keyword context in the report payload.
-     */
-    private suspend fun getKeywordsForMessage(messageId: Long): List<String> {
-        return try {
-            val messageKeywords = database
-                .messageKeywordDao()
-                .getMatchesForMessage(messageId)
-
-            messageKeywords.mapNotNull { mk ->
-                mk.matchedText
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(TAG, "Could not fetch keywords for message $messageId: ${e.message}")
-            emptyList()
         }
     }
 

@@ -7,11 +7,8 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 
 /**
- * Retrofit interface for submitting anonymized
- * detection reports to the remote server.
- *
- * Only anonymized metadata is transmitted —
- * no raw SMS content is ever sent.
+ * Retrofit interface for submitting feedback and a scan snapshot.
+ * SMS text is sent only when the user opts in.
  */
 interface ReportApiService {
 
@@ -24,8 +21,7 @@ interface ReportApiService {
 }
 
 /**
- * Anonymized report data sent to the remote server.
- * Contains only detection metadata — no raw SMS content.
+ * Submission-time scan snapshot and optional user-approved SMS text.
  */
 data class ReportPayload(
     val reportType: String,
@@ -35,7 +31,16 @@ data class ReportPayload(
     val gemmaRationale: String?,
     val detectedKeywords: List<String>,
     val reportedAt: Long,
-    val appVersion: String = "1.0"
+    val appVersion: String,
+    val clientReportId: String?,
+    val finalVerdict: String?,
+    val ruleVerdict: String?,
+    val processingState: String?,
+    val aiStatus: String?,
+    val gemmaConfidence: String?,
+    val modelVersion: String?,
+    val smsText: String?,
+    val messageSharingConsent: Boolean?
 )
 
 /**
