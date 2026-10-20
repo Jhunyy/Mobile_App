@@ -1,6 +1,7 @@
 package com.apcida.smishingdetector.view.fragment
 
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.database.ContentObserver
 import android.os.Bundle
 import android.os.Handler
@@ -31,6 +32,9 @@ import com.apcida.smishingdetector.view.dialog.ReportFormDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MessageDetailFragment : Fragment() {
 
@@ -163,6 +167,9 @@ class MessageDetailFragment : Fragment() {
             )
 
             showSender(message)
+            textReceivedAt.text = SimpleDateFormat(
+                "MMM d, yyyy • h:mm a", Locale.getDefault()
+            ).format(Date(message.receivedAt))
 
             // ---------------------------------
             // Message content
@@ -176,63 +183,36 @@ class MessageDetailFragment : Fragment() {
 
             textRiskStatus.text = when {
                 analysisPending && message.processingState == ProcessingState.PENDING.name ->
-                    "Analyzing message…"
-                analysisPending -> when (message.finalClassification) {
-                    Constants.RISK_SCAM -> "Likely scam · AI analysis pending"
-                    Constants.RISK_SUSPICIOUS -> "Suspicious · AI analysis pending"
-                    else -> "No rule indicators found · AI analysis pending"
-                }
-                message.finalClassification == Constants.RISK_SCAM -> "Likely scam"
-                message.finalClassification == Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
-                else -> "No scam indicators found"
+                    "ANALYZING"
+                message.finalClassification == Constants.RISK_SCAM -> "SCAM"
+                message.finalClassification == Constants.RISK_SUSPICIOUS -> "SUSPICIOUS"
+                else -> "SAFE"
             }
 
             textRiskScore.text =
                 "Risk score: ${message.riskScore.toInt()}"
 
             // ---------------------------------
-            // Risk card background
+            // Risk badge and sender avatar
             // ---------------------------------
 
-            val backgroundColor =
-                when {
-                    analysisPending && message.processingState == ProcessingState.PENDING.name ->
-                        Color.parseColor("#EAF0F7")
+            val (statusColor, badgeColor) = when {
+                analysisPending && message.processingState == ProcessingState.PENDING.name ->
+                    Color.parseColor("#346783") to Color.parseColor("#E8F0F6")
+                message.finalClassification == Constants.RISK_SCAM ->
+                    Color.parseColor("#CA433C") to Color.parseColor("#FDECEC")
+                message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                    Color.parseColor("#A86508") to Color.parseColor("#FFF1D8")
+                else ->
+                    Color.parseColor("#218957") to Color.parseColor("#E5F4E9")
+            }
 
-                    message.finalClassification == Constants.RISK_SCAM ->
-                        Color.parseColor("#FDECEC")
-
-                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
-                        Color.parseColor("#FFF4E4")
-
-                    else ->
-                        Color.parseColor("#EAF6EE")
-                }
-
-            cardRiskStatus.setCardBackgroundColor(
-                backgroundColor
-            )
-
-            // ---------------------------------
-            // Risk status text color
-            // ---------------------------------
-
-            val statusColor =
-                when {
-                    analysisPending && message.processingState == ProcessingState.PENDING.name ->
-                        Color.parseColor("#34556B")
-
-                    message.finalClassification == Constants.RISK_SCAM ->
-                        Color.parseColor("#CA433C")
-
-                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
-                        Color.parseColor("#F2A33A")
-
-                    else ->
-                        Color.parseColor("#65B17F")
-                }
-
+            textRiskStatus.background = GradientDrawable().apply {
+                setColor(badgeColor)
+                cornerRadius = 18f * resources.displayMetrics.density
+            }
             textRiskStatus.setTextColor(statusColor)
+            cardSenderAvatar.setCardBackgroundColor(statusColor)
 
             // ---------------------------------
             // Gemma AI Analysis
