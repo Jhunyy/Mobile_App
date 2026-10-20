@@ -228,6 +228,24 @@ class SmsController(context: Context) {
         )
     }
 
+    /** Allows a failed analysis to be retried without changing its rule verdict. */
+    suspend fun queueAiRetry(messageId: Long): Boolean {
+        val message = messageRepository.getMessageById(messageId) ?: return false
+        if (message.processingState != ProcessingState.AI_FAILED.name) return false
+
+        messageRepository.updateMessage(
+            message.copy(
+                gemmaInvoked = false,
+                gemmaClassification = null,
+                gemmaConfidence = null,
+                gemmaRationale = null,
+                aiAnalysisStatus = AiAnalysisStatus.NOT_STARTED.name,
+                processingState = ProcessingState.AI_QUEUED.name
+            )
+        )
+        return true
+    }
+
     private fun showAlert(
         message: Message,
         riskLevel: RiskLevel,

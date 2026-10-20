@@ -13,7 +13,7 @@ import com.apcida.smishingdetector.controller.SmsController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Persistent, process-independent and serialized on-device AI queue. */
+/** Persistent on-device AI work; the shared Gemma validator serializes inference. */
 class SmsProcessingWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -21,7 +21,6 @@ class SmsProcessingWorker(
 
     companion object {
         private const val TAG = "SmsProcessingWorker"
-        private const val UNIQUE_AI_QUEUE = "sms_ai_analysis_queue"
         private const val INPUT_MESSAGE_ID = "message_id"
         private const val MESSAGE_TAG_PREFIX = "sms_ai_message_"
         private const val MAX_AI_ATTEMPTS = 3
@@ -34,16 +33,14 @@ class SmsProcessingWorker(
             if (staleIds.isEmpty()) return@withContext
 
             val workManager = WorkManager.getInstance(appContext)
-            val activeIds = workManager.getWorkInfosForUniqueWork(UNIQUE_AI_QUEUE).get()
-                .filter { !it.state.isFinished }
-                .flatMap { it.tags }
-                .filter { it.startsWith(MESSAGE_TAG_PREFIX) }
-                .mapNotNull { it.removePrefix(MESSAGE_TAG_PREFIX).toLongOrNull() }
-                .toSet()
-
-            staleIds.filterNot { it in activeIds }.forEach { messageId ->
-                Log.w(TAG, "Restoring missing AI work for message $messageId.")
-                enqueue(appContext, messageId)
+            staleIds.forEach { messageId ->
+                val workName = "$MESSAGE_TAG_PREFIX$messageId"
+                val active = workManager.getWorkInfosForUniqueWork(workName).get()
+                    .any { !it.state.isFinished }
+                if (!active) {
+                    Log.w(TAG, "Restoring missing AI work for message $messageId.")
+                    enqueue(appContext, messageId)
+                }
             }
         }
 
@@ -55,8 +52,8 @@ class SmsProcessingWorker(
                 .build()
 
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                UNIQUE_AI_QUEUE,
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                "$MESSAGE_TAG_PREFIX$messageId",
+                ExistingWorkPolicy.KEEP,
                 request
             )
         }

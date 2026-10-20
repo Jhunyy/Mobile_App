@@ -5,9 +5,17 @@ import android.util.Log
 import com.apcida.smishingdetector.model.data.GemmaResult
 import com.apcida.smishingdetector.util.Constants
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.Executor
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class GemmaValidator(private val context: Context) {
 
@@ -17,6 +25,7 @@ class GemmaValidator(private val context: Context) {
     }
 
     private val modelLock = Any()
+    private val inferenceMutex = Mutex()
 
     private var llmInference: LlmInference? = null
     private var isModelLoaded = false
@@ -36,31 +45,56 @@ class GemmaValidator(private val context: Context) {
         matchedKeywords: List<String>
     ): GemmaResult {
         return withContext(Dispatchers.IO) {
-            synchronized(modelLock) {
+            inferenceMutex.withLock {
                 try {
-                    loadModelLocked()
-                    if (llmInference == null) {
+                    loadModel()
+                    val model = synchronized(modelLock) { llmInference }
+                    if (model == null) {
                         Log.w(TAG, "Gemma model not loaded. Returning fallback result.")
-                        return@synchronized GemmaResult.fallback()
+                        return@withLock GemmaResult.fallback()
                     }
 
                     // Build structured prompt
                     val prompt = PromptBuilder.build(messageBody, matchedKeywords)
                     Log.d(TAG, "Prompt built. Running Gemma inference...")
 
-                    // Run inference
-                    val rawOutput = llmInference!!.generateResponse(prompt)
+                    // The async session allows the controller's timeout to cancel
+                    // native generation instead of waiting on a blocking call.
+                    val rawOutput = LlmInferenceSession.createFromOptions(
+                        model,
+                        LlmInferenceSession.LlmInferenceSessionOptions.builder().build()
+                    ).use { session ->
+                        session.addQueryChunk(prompt)
+                        suspendCancellableCoroutine<String> { continuation ->
+                            val future = session.generateResponseAsync()
+                            continuation.invokeOnCancellation {
+                                try {
+                                    session.cancelGenerateResponseAsync()
+                                } catch (error: Exception) {
+                                    Log.w(TAG, "Unable to cancel Gemma generation", error)
+                                }
+                            }
+                            future.addListener({
+                                try {
+                                    continuation.resume(future.get())
+                                } catch (error: Exception) {
+                                    continuation.resumeWithException(error)
+                                }
+                            }, Executor { command -> command.run() })
+                        }
+                    }
                     Log.d(TAG, "Gemma inference completed")
-
                     // Validate output format
                     if (!GemmaOutputParser.isValidFormat(rawOutput)) {
                         Log.w(TAG, "Gemma output format is invalid. Returning fallback.")
-                        return@synchronized GemmaResult.fallback()
+                        return@withLock GemmaResult.fallback()
                     }
 
                     // Parse and return structured result
                     GemmaOutputParser.parse(rawOutput)
 
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "Gemma inference failed", e)
                     GemmaResult.fallback()

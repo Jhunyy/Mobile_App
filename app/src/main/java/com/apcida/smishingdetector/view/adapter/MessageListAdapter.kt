@@ -56,6 +56,7 @@ class MessageListAdapter(
                     ProcessingState.AI_QUEUED.name,
                     ProcessingState.AI_ANALYZING.name
                 )
+                val rulesPending = message.processingState == ProcessingState.PENDING.name
 
                 textSender.text = message.senderAddress?.let { contactNames[it] ?: it }
                     ?: context.getString(R.string.unknown_sender)
@@ -67,7 +68,7 @@ class MessageListAdapter(
                 textTime.text = formatTime(message.receivedAt)
 
                 val indicatorColor = when {
-                    pending -> ContextCompat.getColor(context, R.color.inbox_pending)
+                    rulesPending -> ContextCompat.getColor(context, R.color.inbox_pending)
                     message.finalClassification == Constants.RISK_SCAM ->
                         ContextCompat.getColor(context, R.color.inbox_scam)
                     message.finalClassification == Constants.RISK_SUSPICIOUS ->
@@ -84,9 +85,13 @@ class MessageListAdapter(
                 )
 
                 textRiskBadge.visibility = View.VISIBLE
-                textRiskBadge.text = if (pending) "ANALYZING" else message.finalClassification
+                textRiskBadge.text = when {
+                    rulesPending -> "ANALYZING"
+                    pending -> "${message.finalClassification} · AI PENDING"
+                    else -> message.finalClassification
+                }
                 val badgeBackground = when {
-                    pending -> R.drawable.bg_inbox_badge_pending
+                    rulesPending -> R.drawable.bg_inbox_badge_pending
                     message.finalClassification == Constants.RISK_SCAM -> R.drawable.bg_inbox_badge_scam
                     message.finalClassification == Constants.RISK_SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
                     else -> R.drawable.bg_inbox_badge_safe

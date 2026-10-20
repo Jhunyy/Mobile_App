@@ -5,7 +5,7 @@ import com.apcida.smishingdetector.model.data.GemmaResult
 object GemmaOutputParser {
 
     private val outputPattern = Regex(
-        pattern = """\AClassification:\s*(SCAM|LEGITIMATE)\s*\RConfidence:\s*(HIGH|MEDIUM|LOW)\s*\RReason:\s*([^\r\n]{1,500})\s*\z""",
+        pattern = """\AClassification:\s*(\[(?:SCAM|LEGITIMATE)\]|SCAM|LEGITIMATE)\s*\RConfidence:\s*(\[(?:HIGH|MEDIUM|LOW)\]|HIGH|MEDIUM|LOW)\s*\RReason:\s*([^\r\n]{1,500})\s*\z""",
         option = RegexOption.IGNORE_CASE
     )
 
@@ -25,8 +25,8 @@ object GemmaOutputParser {
         )
 
         return GemmaResult(
-            classification = match.groupValues[1].uppercase(),
-            confidence = match.groupValues[2].uppercase(),
+            classification = match.groupValues[1].trim('[', ']').uppercase(),
+            confidence = match.groupValues[2].trim('[', ']').uppercase(),
             rationale = match.groupValues[3].trim(),
             isSuccessful = true
         )

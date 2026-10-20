@@ -153,7 +153,7 @@ adb push gemma3-1b-it-int4.task /data/local/tmp/llm/
 adb shell ls -lh /data/local/tmp/llm/gemma3-1b-it-int4.task
 ```
 
-The file name must match `gemma3-1b-it-int4.task`. Gemma is best tested on a physical device; Android emulators are not reliably supported by MediaPipe. To diagnose a fallback result, check Logcat for `GemmaValidator` and confirm that the model is readable at the path above. MediaPipe's `maxTokens` covers the prompt **and** the response; the current limit is 200 tokens.
+The file name must match `gemma3-1b-it-int4.task`. Gemma is best tested on a physical device; Android emulators are not reliably supported by MediaPipe. To diagnose a fallback result, check Logcat for `GemmaValidator` and confirm that the model is readable at the path above. The separate `.litertlm` test model cannot be loaded by this MediaPipe path. MediaPipe's `maxTokens` covers the prompt **and** the response; the current limit is 768 tokens. The inbox shows the rule result while AI is pending, then updates when Gemma finishes or becomes unavailable. An unavailable analysis can be retried from the message detail screen.
 
 The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 ```

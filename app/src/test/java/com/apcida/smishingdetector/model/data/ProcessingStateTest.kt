@@ -13,7 +13,7 @@ class ProcessingStateTest {
         assertTrue(ProcessingState.AI_QUEUED.canTransitionTo(ProcessingState.AI_ANALYZING))
         assertTrue(ProcessingState.AI_ANALYZING.canTransitionTo(ProcessingState.COMPLETED))
         assertTrue(ProcessingState.AI_ANALYZING.canTransitionTo(ProcessingState.AI_FAILED))
-        assertTrue(ProcessingState.AI_FAILED.canTransitionTo(ProcessingState.AI_ANALYZING))
+        assertTrue(ProcessingState.AI_FAILED.canTransitionTo(ProcessingState.AI_QUEUED))
     }
 
     @Test

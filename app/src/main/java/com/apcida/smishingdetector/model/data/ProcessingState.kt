@@ -14,7 +14,7 @@ enum class ProcessingState {
         RULE_ANALYZED -> setOf(AI_QUEUED)
         AI_QUEUED -> setOf(AI_ANALYZING)
         AI_ANALYZING -> setOf(COMPLETED, AI_FAILED)
-        AI_FAILED -> setOf(AI_ANALYZING)
+        AI_FAILED -> setOf(AI_QUEUED)
         COMPLETED -> emptySet()
     }
 }

@@ -29,7 +29,7 @@ WorkManager persists queued requests across normal process death. Gemma is appli
 | `COMPLETED` | A valid AI result and combined result are stored | terminal |
 | `AI_FAILED` | AI was unavailable, timed out, failed, or returned malformed output | retry to `AI_ANALYZING`, or remain failed after the retry limit |
 
-The UI shows `ANALYZING` during nonterminal AI states and explicitly shows `AI unavailable` after failure. A failed AI attempt never creates a safe result.
+The UI shows the preliminary rule classification with `AI pending` after rule scoring, and explicitly shows `AI unavailable` after failure. A failed AI attempt never creates a safe result.
 
 ## Rule and AI fusion policy
 
@@ -66,7 +66,7 @@ Duplicate suppression requires the same sender hash and content hash within a te
 
 ## Performance and battery tradeoffs
 
-Always-on inference costs more latency, memory, and battery than threshold-gated inference. A single unique WorkManager chain and an inference mutex prevent concurrent model sessions, reducing peak memory and device contention at the cost of queue latency during SMS bursts. The model is retained at application scope to avoid repeated loading; Android can still reclaim the whole process. A 90-second application timeout and bounded retries prevent endless logical processing, although cancellation behavior ultimately depends on the synchronous MediaPipe inference implementation.
+Always-on inference costs more latency, memory, and battery than threshold-gated inference. A single unique WorkManager chain and an inference mutex prevent concurrent model sessions, reducing peak memory and device contention at the cost of queue latency during SMS bursts. The model is retained at application scope to avoid repeated loading; Android can still reclaim the whole process. Generation uses an asynchronous MediaPipe session so the 90-second application timeout can request cancellation; bounded retries handle failures. Model loading itself remains a blocking native operation.
 
 ## Recommended tests and evaluation metrics
 

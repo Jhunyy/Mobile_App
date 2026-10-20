@@ -42,6 +42,21 @@ class GemmaOutputParserTest {
     }
 
     @Test
+    fun parse_acceptsBracketedValuesReturnedByGemma() {
+        val rawOutput = """
+            Classification: [LEGITIMATE]
+            Confidence: HIGH
+            Reason: This is an ordinary meeting reminder.
+        """.trimIndent()
+
+        val result = GemmaOutputParser.parse(rawOutput)
+
+        assertTrue(result.isSuccessful)
+        assertEquals(Constants.GEMMA_LEGITIMATE, result.classification)
+        assertEquals(Constants.CONFIDENCE_HIGH, result.confidence)
+    }
+
+    @Test
     fun parse_rejectsUnexpectedValuesAsUnavailable() {
         val rawOutput = """
             Classification: MAYBE

@@ -16,6 +16,8 @@ import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
+import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
+import com.apcida.smishingdetector.controller.SmsController
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
@@ -173,7 +175,13 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             textRiskStatus.text = when {
-                analysisPending -> "Analyzing message…"
+                analysisPending && message.processingState == ProcessingState.PENDING.name ->
+                    "Analyzing message…"
+                analysisPending -> when (message.finalClassification) {
+                    Constants.RISK_SCAM -> "Likely scam · AI analysis pending"
+                    Constants.RISK_SUSPICIOUS -> "Suspicious · AI analysis pending"
+                    else -> "No rule indicators found · AI analysis pending"
+                }
                 message.finalClassification == Constants.RISK_SCAM -> "Likely scam"
                 message.finalClassification == Constants.RISK_SUSPICIOUS -> "Suspicious — verify independently"
                 else -> "No scam indicators found"
@@ -188,7 +196,8 @@ class MessageDetailFragment : Fragment() {
 
             val backgroundColor =
                 when {
-                    analysisPending -> Color.parseColor("#EAF0F7")
+                    analysisPending && message.processingState == ProcessingState.PENDING.name ->
+                        Color.parseColor("#EAF0F7")
 
                     message.finalClassification == Constants.RISK_SCAM ->
                         Color.parseColor("#FDECEC")
@@ -210,7 +219,8 @@ class MessageDetailFragment : Fragment() {
 
             val statusColor =
                 when {
-                    analysisPending -> Color.parseColor("#34556B")
+                    analysisPending && message.processingState == ProcessingState.PENDING.name ->
+                        Color.parseColor("#34556B")
 
                     message.finalClassification == Constants.RISK_SCAM ->
                         Color.parseColor("#CA433C")
@@ -229,16 +239,31 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             if (analysisPending) {
+                btnRetryAi.visibility = View.GONE
                 cardGemmaAnalysis.visibility = View.VISIBLE
                 textGemmaRationale.text = "Analyzing this message on your device…"
                 textGemmaConfidence.visibility = View.GONE
             } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
+                btnRetryAi.visibility = View.VISIBLE
+                btnRetryAi.setOnClickListener {
+                    btnRetryAi.isEnabled = false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val context = requireContext().applicationContext
+                        if (SmsController(context).queueAiRetry(message.messageId)) {
+                            SmsProcessingWorker.enqueue(context, message.messageId)
+                        } else {
+                            btnRetryAi.isEnabled = true
+                        }
+                    }
+                }
+                btnRetryAi.isEnabled = true
                 cardGemmaAnalysis.visibility = View.VISIBLE
                 textGemmaRationale.text = message.gemmaRationale
                     ?: "AI analysis is unavailable; the rule result was preserved."
                 textGemmaConfidence.visibility = View.VISIBLE
                 textGemmaConfidence.text = "Status: AI unavailable"
             } else if (message.gemmaInvoked) {
+                btnRetryAi.visibility = View.GONE
 
                 // Gemma was attempted, so show the card
                 cardGemmaAnalysis.visibility = View.VISIBLE
@@ -275,6 +300,7 @@ class MessageDetailFragment : Fragment() {
                 }
 
             } else {
+                btnRetryAi.visibility = View.GONE
 
                 // Gemma was never invoked for this message
                 cardGemmaAnalysis.visibility = View.GONE
