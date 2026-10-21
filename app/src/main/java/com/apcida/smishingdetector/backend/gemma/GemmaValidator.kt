@@ -58,36 +58,18 @@ class GemmaValidator(private val context: Context) {
                     val prompt = PromptBuilder.build(messageBody, matchedKeywords)
                     Log.d(TAG, "Prompt built. Running Gemma inference...")
 
-                    // The async session allows the controller's timeout to cancel
-                    // native generation instead of waiting on a blocking call.
-                    val rawOutput = LlmInferenceSession.createFromOptions(
-                        model,
-                        LlmInferenceSession.LlmInferenceSessionOptions.builder().build()
-                    ).use { session ->
-                        session.addQueryChunk(prompt)
-                        suspendCancellableCoroutine<String> { continuation ->
-                            val future = session.generateResponseAsync()
-                            continuation.invokeOnCancellation {
-                                try {
-                                    session.cancelGenerateResponseAsync()
-                                } catch (error: Exception) {
-                                    Log.w(TAG, "Unable to cancel Gemma generation", error)
-                                }
-                            }
-                            future.addListener({
-                                try {
-                                    continuation.resume(future.get())
-                                } catch (error: Exception) {
-                                    continuation.resumeWithException(error)
-                                }
-                            }, Executor { command -> command.run() })
-                        }
-                    }
+                    var rawOutput = generateResponse(model, prompt)
                     Log.d(TAG, "Gemma inference completed")
-                    // Validate output format
                     if (!GemmaOutputParser.isValidFormat(rawOutput)) {
-                        Log.w(TAG, "Gemma output format is invalid. Returning fallback.")
-                        return@withLock GemmaResult.fallback()
+                        Log.w(TAG, "Gemma output format is invalid. Retrying with a format reminder.")
+                        rawOutput = generateResponse(
+                            model,
+                            "$prompt\n\nReturn exactly three lines. Classification must be SCAM or LEGITIMATE; Confidence must be HIGH, MEDIUM, or LOW."
+                        )
+                        if (!GemmaOutputParser.isValidFormat(rawOutput)) {
+                            Log.w(TAG, "Gemma retry output format is invalid. Returning fallback.")
+                            return@withLock GemmaResult.fallback()
+                        }
                     }
 
                     // Parse and return structured result
@@ -99,6 +81,34 @@ class GemmaValidator(private val context: Context) {
                     Log.e(TAG, "Gemma inference failed", e)
                     GemmaResult.fallback()
                 }
+            }
+        }
+    }
+
+    /** Each attempt uses a fresh session so malformed output cannot contaminate the retry. */
+    private suspend fun generateResponse(model: LlmInference, prompt: String): String {
+        // The async session allows the controller's timeout to cancel native generation.
+        return LlmInferenceSession.createFromOptions(
+            model,
+            LlmInferenceSession.LlmInferenceSessionOptions.builder().build()
+        ).use { session ->
+            session.addQueryChunk(prompt)
+            suspendCancellableCoroutine { continuation ->
+                val future = session.generateResponseAsync()
+                continuation.invokeOnCancellation {
+                    try {
+                        session.cancelGenerateResponseAsync()
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Unable to cancel Gemma generation", error)
+                    }
+                }
+                future.addListener({
+                    try {
+                        continuation.resume(future.get())
+                    } catch (error: Exception) {
+                        continuation.resumeWithException(error)
+                    }
+                }, Executor { command -> command.run() })
             }
         }
     }

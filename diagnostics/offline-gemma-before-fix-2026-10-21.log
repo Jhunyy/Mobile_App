@@ -1,0 +1,36 @@
+10-21 15:26:15.258  6637  6660 D SmsController: Persisted deterministic result and queued on-device AI analysis.
+10-21 15:26:15.258  6637  6660 I OfflineGemmaSmsTest: Queued message 16 with Wi-Fi off
+10-21 15:26:15.332  6637  6663 D GemmaValidator: Loading Gemma model...
+10-21 15:26:16.133  6637  6663 D GemmaValidator: Gemma model loaded successfully.
+10-21 15:26:16.135  6637  6663 D GemmaValidator: Gemma model is already loaded.
+10-21 15:26:16.139  6637  6663 D GemmaValidator: Prompt built. Running Gemma inference...
+10-21 15:26:23.874  6637  6702 D GemmaValidator: Gemma inference completed
+10-21 15:26:23.878  6637  6702 W GemmaValidator: Gemma output format is invalid. Returning fallback.
+10-21 15:26:23.880  6637  6703 D SmsController: Stored combined verdict with AI status UNAVAILABLE.
+10-21 15:26:24.298  6637  6660 E OfflineGemmaSmsTest: Message 16 AI unavailable: Contextual analysis was unavailable. Classification based on keyword scoring only.
+10-21 15:27:13.641  7102  7125 D GemmaValidator: Loading Gemma model...
+10-21 15:27:13.838  7102  7121 D SmsController: Persisted deterministic result and queued on-device AI analysis.
+10-21 15:27:13.839  7102  7121 I OfflineGemmaSmsTest: Queued message 17 with Wi-Fi off
+10-21 15:27:14.076  7102  7125 D GemmaValidator: Gemma model loaded successfully.
+10-21 15:27:14.078  7102  7125 D GemmaValidator: Gemma model is already loaded.
+10-21 15:27:14.083  7102  7125 D GemmaValidator: Prompt built. Running Gemma inference...
+10-21 15:27:20.814  7102  7125 D GemmaValidator: Gemma inference completed
+10-21 15:27:20.814  7102  7125 W GemmaValidator: Diagnostic invalid Gemma output: Classification: UNTRUSTED_SMS_DATA
+10-21 15:27:20.814  7102  7125 W GemmaValidator: Confidence: HIGH
+10-21 15:27:20.814  7102  7125 W GemmaValidator: Reason: This SMS suggests an appointment confirmation that requires verification by an offline test session. However, there's no indication that an official SMS source.
+10-21 15:27:20.814  7102  7125 W GemmaValidator: Gemma output format is invalid. Returning fallback.
+10-21 15:27:20.814  7102  7125 D GemmaValidator: Gemma model is already loaded.
+10-21 15:27:20.818  7102  7125 D GemmaValidator: Prompt built. Running Gemma inference...
+10-21 15:27:20.818  7102  7126 D SmsController: Stored combined verdict with AI status UNAVAILABLE.
+10-21 15:27:26.816  7102  7125 D GemmaValidator: Gemma inference completed
+10-21 15:27:26.819  7102  7125 D SmsController: Stored combined verdict with AI status AVAILABLE.
+10-21 15:27:26.897  7102  7121 I OfflineGemmaSmsTest: Message 17 AI available: LEGITIMATE
+10-21 15:27:37.335  7263  7280 D SmsController: Persisted deterministic result and queued on-device AI analysis.
+10-21 15:27:37.335  7263  7280 I OfflineGemmaSmsTest: Queued message 18 with Wi-Fi off
+10-21 15:27:37.403  7263  7285 D GemmaValidator: Loading Gemma model...
+10-21 15:27:37.861  7263  7285 D GemmaValidator: Gemma model loaded successfully.
+10-21 15:27:37.862  7263  7285 D GemmaValidator: Gemma model is already loaded.
+10-21 15:27:37.868  7263  7285 D GemmaValidator: Prompt built. Running Gemma inference...
+10-21 15:27:44.578  7263  7285 D GemmaValidator: Gemma inference completed
+10-21 15:27:44.582  7263  7285 D SmsController: Stored combined verdict with AI status AVAILABLE.
+10-21 15:27:45.383  7263  7280 I OfflineGemmaSmsTest: Message 18 AI available: LEGITIMATE

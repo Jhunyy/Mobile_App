@@ -1,0 +1,12 @@
+--------- beginning of main
+10-21 15:34:05.283 10624 10642 D SmsController: Persisted deterministic result and queued on-device AI analysis.
+10-21 15:34:05.283 10624 10642 I OfflineGemmaSmsTest: Queued message 23 with Wi-Fi off
+10-21 15:34:05.359 10624 10647 D SmsProcessingWorker: Analyzing message 23, attempt 1 of 3.
+10-21 15:34:05.374 10624 10647 D GemmaValidator: Loading Gemma model...
+10-21 15:34:06.103 10624 10647 D GemmaValidator: Gemma model loaded successfully.
+10-21 15:34:06.105 10624 10647 D GemmaValidator: Gemma model is already loaded.
+10-21 15:34:06.109 10624 10647 D GemmaValidator: Prompt built. Running Gemma inference...
+10-21 15:34:12.337 10624 10647 D GemmaValidator: Gemma inference completed
+10-21 15:34:12.361 10624 10647 D SmsController: Stored combined verdict with AI status AVAILABLE.
+10-21 15:34:12.361 10624 10647 D SmsProcessingWorker: AI analysis completed for message 23.
+10-21 15:34:13.340 10624 10642 I OfflineGemmaSmsTest: Message 23 AI available: SCAM

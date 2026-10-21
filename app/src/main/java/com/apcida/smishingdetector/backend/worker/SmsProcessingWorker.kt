@@ -64,22 +64,32 @@ class SmsProcessingWorker(
         if (messageId <= 0) return Result.failure()
 
         return try {
+            val finalAttempt = runAttemptCount >= MAX_AI_ATTEMPTS - 1
+            Log.d(TAG, "Analyzing message $messageId, attempt ${runAttemptCount + 1} of $MAX_AI_ATTEMPTS.")
             val controller = SmsController(applicationContext)
-            val aiCompleted = controller.analyzeWithAi(messageId)
+            val aiCompleted = controller.analyzeWithAi(messageId, finalAttempt)
             when {
-                aiCompleted -> Result.success()
-                runAttemptCount < MAX_AI_ATTEMPTS - 1 -> Result.retry()
+                aiCompleted -> {
+                    Log.d(TAG, "AI analysis completed for message $messageId.")
+                    Result.success()
+                }
+                !finalAttempt -> {
+                    Log.w(TAG, "AI analysis unavailable for message $messageId; retrying.")
+                    Result.retry()
+                }
                 else -> {
-                    Log.w(TAG, "AI analysis unavailable after the final attempt.")
+                    Log.w(TAG, "AI analysis unavailable for message $messageId after the final attempt.")
                     Result.failure()
                 }
             }
         } catch (error: Exception) {
             Log.e(TAG, "SMS AI analysis attempt failed.", error)
-            try {
-                SmsController(applicationContext).markAiUnavailable(messageId)
-            } catch (stateError: Exception) {
-                Log.e(TAG, "Unable to persist the AI failure state.", stateError)
+            if (runAttemptCount >= MAX_AI_ATTEMPTS - 1) {
+                try {
+                    SmsController(applicationContext).markAiUnavailable(messageId)
+                } catch (stateError: Exception) {
+                    Log.e(TAG, "Unable to persist the AI failure state.", stateError)
+                }
             }
             if (runAttemptCount < MAX_AI_ATTEMPTS - 1) Result.retry() else Result.failure()
         }

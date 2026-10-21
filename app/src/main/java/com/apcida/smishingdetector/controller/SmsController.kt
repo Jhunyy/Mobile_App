@@ -138,7 +138,7 @@ class SmsController(context: Context) {
     }
 
     /** Runs one serialized Gemma attempt for a previously persisted message. */
-    suspend fun analyzeWithAi(messageId: Long): Boolean {
+    suspend fun analyzeWithAi(messageId: Long, finalAttempt: Boolean = true): Boolean {
         val message = messageRepository.getMessageById(messageId) ?: return true
         if (message.processingState == ProcessingState.COMPLETED.name) return true
 
@@ -165,22 +165,26 @@ class SmsController(context: Context) {
             )
         } ?: GemmaResult.fallback("Gemma inference timed out.")
 
-        val finalVerdict = FinalVerdictResolver.resolve(ruleRiskLevel, gemmaResult)
-        val processingState = if (gemmaResult.isSuccessful) {
-            ProcessingState.COMPLETED
+        val finalVerdict = if (gemmaResult.isSuccessful || finalAttempt) {
+            FinalVerdictResolver.resolve(ruleRiskLevel, gemmaResult)
         } else {
-            ProcessingState.AI_FAILED
+            FinalVerdictResolver.Verdict(ruleRiskLevel, ruleRiskLevel != RiskLevel.SAFE)
         }
-        val aiStatus = if (gemmaResult.isSuccessful) {
-            AiAnalysisStatus.AVAILABLE
-        } else {
-            AiAnalysisStatus.UNAVAILABLE
+        val processingState = when {
+            gemmaResult.isSuccessful -> ProcessingState.COMPLETED
+            finalAttempt -> ProcessingState.AI_FAILED
+            else -> ProcessingState.AI_QUEUED
+        }
+        val aiStatus = when {
+            gemmaResult.isSuccessful -> AiAnalysisStatus.AVAILABLE
+            finalAttempt -> AiAnalysisStatus.UNAVAILABLE
+            else -> AiAnalysisStatus.NOT_STARTED
         }
 
         val completedMessage = analyzingMessage.copy(
-            gemmaClassification = gemmaResult.classification,
-            gemmaConfidence = gemmaResult.confidence,
-            gemmaRationale = gemmaResult.rationale,
+            gemmaClassification = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.classification else null,
+            gemmaConfidence = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.confidence else null,
+            gemmaRationale = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.rationale else null,
             aiAnalysisStatus = aiStatus.name,
             processingState = processingState.name,
             riskLevel = finalVerdict.riskLevel.name,
