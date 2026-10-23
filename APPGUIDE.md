@@ -54,7 +54,7 @@ Stage 1 risk reference:
 const val RISK_THRESHOLD = 60f
 ```
 
-Every newly saved non-duplicate message is queued for Gemma, including messages with no keyword matches. Later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment and is not discounted for saved contacts. A saved contact can clear a rule-SUSPICIOUS result only with HIGH-confidence LEGITIMATE Gemma analysis, no strong rule signal, and no combined-score warning. Gemma loads on demand and serializes inference. If contextual analysis is unavailable, rule-SAFE becomes SUSPICIOUS for review while rule-SUSPICIOUS and rule-SCAM retain their levels.
+Every newly saved non-duplicate message is queued for Gemma, including messages with no keyword matches. Later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment and is not discounted for saved contacts. A saved contact can clear a rule-SUSPICIOUS result only with HIGH-confidence LEGITIMATE Gemma analysis, no strong rule signal, and no combined-score warning. Gemma loads on demand and serializes inference. If contextual analysis is unavailable, rule-SAFE becomes SUSPICIOUS for review while rule-SUSPICIOUS and rule-SCAM retain their levels. A simple greeting without links, requests, or rule signals is SAFE even if Gemma suggests scam or is unavailable; a confirmed scam from the same sender in the preceding 24 hours makes the greeting SUSPICIOUS.
 
 ## Current Architecture
 

@@ -209,8 +209,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/dm_sans_bold"
-                    android:text="AI Analysis"
-                    android:textColor="@color/color_suspicious"
+                    android:text="Why this result"
+                    android:textColor="@color/text_primary"
                     android:textSize="15sp" />
 
                 <TextView
@@ -219,7 +219,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:fontFamily="@font/dm_sans_bold"
-                    android:text="Recent sender history: A message from this sender was confirmed as a scam within 24 hours before this SMS. This history raises the risk of the latest SMS."
+                    android:text="Recent sender history: A message from this sender was classified as a scam within 24 hours before this SMS. This history raises the risk of the latest SMS."
                     android:textColor="@color/inbox_suspicious"
                     android:textSize="14sp"
                     android:visibility="gone" />
@@ -234,14 +234,54 @@
                     android:textColor="@color/text_primary"
                     android:textSize="15sp" />
 
-                <TextView
-                    android:id="@+id/text_gemma_confidence"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_toggle_analysis_details"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="44dp"
                     android:layout_marginTop="10dp"
-                    android:fontFamily="@font/dm_sans_regular"
-                    android:textColor="@color/inbox_muted"
-                    android:textSize="12sp" />
+                    android:fontFamily="@font/dm_sans_bold"
+                    android:text="Show analysis details"
+                    android:textAllCaps="false"
+                    android:textColor="@color/inbox_green"
+                    android:textSize="13sp"
+                    android:visibility="gone"
+                    app:backgroundTint="@color/inbox_green_soft"
+                    app:cornerRadius="9dp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_analysis_details"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/text_gemma_classification"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:fontFamily="@font/dm_sans_regular"
+                        android:textColor="@color/inbox_muted"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/text_gemma_confidence"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:fontFamily="@font/dm_sans_regular"
+                        android:textColor="@color/inbox_muted"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/text_gemma_raw_reason"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:fontFamily="@font/dm_sans_regular"
+                        android:textColor="@color/inbox_muted"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_retry_ai"

@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.backend.detection.SimpleGreetingPolicy
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.reporting.ReportSnapshotFactory
@@ -49,6 +50,7 @@ class MessageDetailFragment : Fragment() {
     private lateinit var pullToRefresh: PullToRefreshLayout
 
     private var currentMessage: Message? = null
+    private var analysisDetailsExpanded = false
     private var senderName: String? = null
     private var senderLookupJob: Job? = null
     private var lastResolvedAddress: String? = null
@@ -197,6 +199,10 @@ class MessageDetailFragment : Fragment() {
                 ProcessingState.AI_QUEUED.name,
                 ProcessingState.AI_ANALYZING.name
             )
+            val simpleGreeting = SimpleGreetingPolicy.isEligible(
+                message.content, message.riskScore,
+                message.hasStrongRuleSignal, message.senderRiskPoints
+            )
 
             showSender(message)
             textReceivedAt.text = SimpleDateFormat(
@@ -265,13 +271,14 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             textRecentSenderHistory.visibility =
-                if (message.historyRiskPoints == 25) View.VISIBLE else View.GONE
+                if (message.historyRiskPoints == 25 && !simpleGreeting) View.VISIBLE else View.GONE
 
             if (analysisPending) {
                 btnRetryAi.visibility = View.GONE
                 cardGemmaAnalysis.visibility = View.VISIBLE
                 textGemmaRationale.text = "Analyzing this message on your device…"
-                textGemmaConfidence.visibility = View.GONE
+                btnToggleAnalysisDetails.visibility = View.GONE
+                layoutAnalysisDetails.visibility = View.GONE
             } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
                 btnRetryAi.visibility = View.VISIBLE
                 btnRetryAi.setOnClickListener {
@@ -287,25 +294,57 @@ class MessageDetailFragment : Fragment() {
                 }
                 btnRetryAi.isEnabled = true
                 cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = message.gemmaRationale
-                    ?: "AI analysis is unavailable; the rule result was preserved."
-                textGemmaConfidence.visibility = View.VISIBLE
-                textGemmaConfidence.text = "Status: AI unavailable"
+                textGemmaRationale.text = when {
+                    simpleGreeting && message.historyRiskPoints == 25 ->
+                        "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious. AI analysis is unavailable."
+                    simpleGreeting ->
+                        "This is a simple greeting with no scam request or link. AI analysis is unavailable."
+                    else -> message.gemmaRationale
+                        ?: "AI analysis is unavailable; the rule result was preserved."
+                }
+                btnToggleAnalysisDetails.visibility = View.GONE
+                layoutAnalysisDetails.visibility = View.GONE
             } else if (message.gemmaInvoked) {
                 btnRetryAi.visibility = View.GONE
 
                 // Gemma was attempted, so show the card
                 cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaConfidence.visibility = View.VISIBLE
+                btnToggleAnalysisDetails.visibility = View.VISIBLE
+                layoutAnalysisDetails.visibility =
+                    if (analysisDetailsExpanded) View.VISIBLE else View.GONE
+                btnToggleAnalysisDetails.text =
+                    if (analysisDetailsExpanded) "Hide analysis details" else "Show analysis details"
+                btnToggleAnalysisDetails.setOnClickListener {
+                    analysisDetailsExpanded = !analysisDetailsExpanded
+                    layoutAnalysisDetails.visibility =
+                        if (analysisDetailsExpanded) View.VISIBLE else View.GONE
+                    btnToggleAnalysisDetails.text =
+                        if (analysisDetailsExpanded) "Hide analysis details" else "Show analysis details"
+                }
+                val aiResult = message.gemmaClassification ?: "Unavailable"
+                val excluded = simpleGreeting && aiResult == Constants.GEMMA_SCAM
+                textGemmaClassification.text = if (excluded) {
+                    "AI result: SCAM (excluded from final verdict)"
+                } else {
+                    "AI result: $aiResult"
+                }
+                textGemmaConfidence.text =
+                    "Model confidence: ${message.gemmaConfidence ?: "N/A"} (self-reported, not a probability)"
+                textGemmaRawReason.text =
+                    "AI reason: ${message.gemmaRationale ?: "No explanation available."}"
 
                 if (message.gemmaClassification != Constants.GEMMA_UNCERTAIN &&
                     !message.gemmaRationale.isNullOrEmpty()) {
 
-                    // Gemma successfully returned an explanation
+                    // The main explanation describes the final verdict.
                     textGemmaRationale.text = when {
+                        simpleGreeting && message.historyRiskPoints == 25 ->
+                            "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious."
+                        simpleGreeting ->
+                            "This is a simple greeting with no scam request or link. No risk signals were found in this SMS."
                         message.gemmaClassification == Constants.GEMMA_SCAM &&
                             message.finalClassification != Constants.RISK_SCAM ->
-                            "The AI suggested scam, but the available evidence did not justify a scam alert. ${message.gemmaRationale}"
+                            "This message needs review, but the available evidence did not justify a scam verdict."
                         message.finalClassification == Constants.RISK_SUSPICIOUS &&
                             message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
                             if (message.historyRiskPoints == 25) {
@@ -318,20 +357,18 @@ class MessageDetailFragment : Fragment() {
                         else -> message.gemmaRationale
                     }
 
-                    textGemmaConfidence.text =
-                        "Confidence: ${message.gemmaConfidence ?: "N/A"}"
-
                 } else {
 
                     // Gemma was invoked but inference was unavailable
-                    textGemmaRationale.text = if (message.gemmaConfidence == null) {
-                        "Contextual analysis was unavailable. Classification based on keyword scoring only."
-                    } else {
-                        message.gemmaRationale ?: "Contextual analysis was inconclusive."
+                    textGemmaRationale.text = when {
+                        simpleGreeting && message.historyRiskPoints == 25 ->
+                            "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious."
+                        simpleGreeting ->
+                            "This is a simple greeting with no scam request or link."
+                        message.gemmaConfidence == null ->
+                            "Contextual analysis was unavailable. Classification based on keyword scoring only."
+                        else -> message.gemmaRationale ?: "Contextual analysis was inconclusive."
                     }
-
-                    textGemmaConfidence.text =
-                        "Confidence: ${message.gemmaConfidence ?: "LOW"}"
                 }
 
             } else {
@@ -339,6 +376,8 @@ class MessageDetailFragment : Fragment() {
 
                 // Gemma was never invoked for this message
                 cardGemmaAnalysis.visibility = View.GONE
+                btnToggleAnalysisDetails.visibility = View.GONE
+                layoutAnalysisDetails.visibility = View.GONE
             }
 
             // ---------------------------------
@@ -494,6 +533,7 @@ class MessageDetailFragment : Fragment() {
 
     override fun onDestroyView() {
         senderLookupJob?.cancel()
+        analysisDetailsExpanded = false
         super.onDestroyView()
 
         _binding = null

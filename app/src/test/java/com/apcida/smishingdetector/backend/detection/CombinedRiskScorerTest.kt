@@ -69,7 +69,12 @@ class CombinedRiskScorerTest {
             listOf(confirmed.copy(aiAnalysisStatus = "UNAVAILABLE")), now
         ))
         assertEquals(10, ConversationRiskPolicy.historyPoints(
-            listOf(confirmed.copy(gemmaConfidence = "LOW", finalClassification = "SUSPICIOUS")), now
+            listOf(confirmed.copy(gemmaConfidence = "LOW", finalClassification = "SUSPICIOUS",
+                aiRiskPoints = 30)), now
+        ))
+        assertEquals(0, ConversationRiskPolicy.historyPoints(
+            listOf(confirmed.copy(gemmaConfidence = "LOW", finalClassification = "SAFE",
+                aiRiskPoints = 0)), now
         ))
     }
 

@@ -69,7 +69,7 @@ interface MessageDao {
           AND ai_analysis_status = 'AVAILABLE'
           AND gemma_classification = 'SCAM'
           AND ((final_classification = 'SCAM' AND gemma_confidence IN ('HIGH', 'MEDIUM'))
-               OR gemma_confidence = 'LOW')
+               OR (final_classification != 'SAFE' AND gemma_confidence = 'LOW' AND ai_risk_points > 0))
         ORDER BY CASE
             WHEN final_classification = 'SCAM' AND gemma_confidence IN ('HIGH', 'MEDIUM') THEN 0
             ELSE 1

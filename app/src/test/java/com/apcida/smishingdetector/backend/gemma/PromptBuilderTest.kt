@@ -34,6 +34,9 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("Latest SMS to classify: \"Okay\""))
         assertTrue(prompt.contains("judge only the latest SMS"))
         assertTrue(prompt.contains("Shortness is not evidence that it is safe"))
+        assertTrue(prompt.contains("simple greetings without a request or link are legitimate"))
+        assertTrue(prompt.contains("Missing context is not scam evidence"))
+        assertTrue(prompt.contains("only a greeting and has no concrete scam indicator, classify it LEGITIMATE"))
     }
 
     @Test

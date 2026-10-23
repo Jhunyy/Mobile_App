@@ -13,6 +13,7 @@ import com.apcida.smishingdetector.backend.detection.KeywordEngine
 import com.apcida.smishingdetector.backend.detection.MessageSignals
 import com.apcida.smishingdetector.backend.detection.RiskScorer
 import com.apcida.smishingdetector.backend.detection.SenderSignals
+import com.apcida.smishingdetector.backend.detection.SimpleGreetingPolicy
 import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.repository.MessageRepository
@@ -228,14 +229,22 @@ class SmsController(context: Context) {
             finalAttempt -> AiAnalysisStatus.UNAVAILABLE
             else -> AiAnalysisStatus.NOT_STARTED
         }
+        val historyPoints = recentHistoryPoints(message)
+        val simpleGreeting = SimpleGreetingPolicy.isEligible(
+            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
+        )
         val combined = CombinedRiskScorer.score(
             ruleScore = message.riskScore,
             hasStrongRuleSignal = message.hasStrongRuleSignal,
-            historyPoints = recentHistoryPoints(message),
+            historyPoints = historyPoints,
             senderPoints = message.senderRiskPoints,
-            gemmaResult = gemmaResult
+            gemmaResult = gemmaResult.takeUnless { simpleGreeting }
         )
-        val finalRiskLevel = CombinedRiskScorer.withSuspiciousFloor(finalVerdict.riskLevel, combined.total)
+        val finalRiskLevel = if (simpleGreeting) {
+            SimpleGreetingPolicy.verdict(historyPoints)
+        } else {
+            CombinedRiskScorer.withSuspiciousFloor(finalVerdict.riskLevel, combined.total)
+        }
 
         val completedMessage = analyzingMessage.copy(
             gemmaClassification = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.classification else null,
@@ -255,7 +264,9 @@ class SmsController(context: Context) {
         messageRepository.updateMessage(completedMessage)
         refreshOwnHistoryWarning(messageId)
 
-        if (gemmaResult.isSuccessful && gemmaResult.classification == Constants.GEMMA_SCAM) {
+        if (gemmaResult.isSuccessful && gemmaResult.classification == Constants.GEMMA_SCAM &&
+            !simpleGreeting
+        ) {
             refreshLaterWarnings(completedMessage)
         }
 
@@ -282,13 +293,21 @@ class SmsController(context: Context) {
         }.getOrDefault(RiskLevel.SUSPICIOUS)
         val fallback = GemmaResult.fallback()
         val verdict = FinalVerdictResolver.resolve(ruleRiskLevel, fallback)
+        val historyPoints = recentHistoryPoints(message)
+        val simpleGreeting = SimpleGreetingPolicy.isEligible(
+            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
+        )
         val combined = CombinedRiskScorer.score(
             ruleScore = message.riskScore,
             hasStrongRuleSignal = message.hasStrongRuleSignal,
-            historyPoints = recentHistoryPoints(message),
+            historyPoints = historyPoints,
             senderPoints = message.senderRiskPoints
         )
-        val finalRiskLevel = CombinedRiskScorer.withSuspiciousFloor(verdict.riskLevel, combined.total)
+        val finalRiskLevel = if (simpleGreeting) {
+            SimpleGreetingPolicy.verdict(historyPoints)
+        } else {
+            CombinedRiskScorer.withSuspiciousFloor(verdict.riskLevel, combined.total)
+        }
 
         messageRepository.updateMessage(
             message.copy(
@@ -337,12 +356,15 @@ class SmsController(context: Context) {
                 message.gemmaRationale.orEmpty()
             )
         } else null
+        val simpleGreeting = SimpleGreetingPolicy.isEligible(
+            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
+        )
         val combined = CombinedRiskScorer.score(
             ruleScore = message.riskScore,
             hasStrongRuleSignal = message.hasStrongRuleSignal,
             historyPoints = historyPoints,
             senderPoints = message.senderRiskPoints,
-            gemmaResult = gemmaResult
+            gemmaResult = gemmaResult?.takeUnless { simpleGreeting }
         )
         messageRepository.applyHistoryWarning(messageId, combined.total, combined.historyPoints)
     }

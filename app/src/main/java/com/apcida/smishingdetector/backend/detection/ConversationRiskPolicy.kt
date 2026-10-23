@@ -23,8 +23,10 @@ object ConversationRiskPolicy {
                     it.gemmaConfidence in setOf(Constants.CONFIDENCE_HIGH, Constants.CONFIDENCE_MEDIUM)
             } -> 25
             recent.any {
-                it.gemmaClassification == Constants.GEMMA_SCAM &&
-                    it.gemmaConfidence == Constants.CONFIDENCE_LOW
+                it.finalClassification != Constants.RISK_SAFE &&
+                    it.gemmaClassification == Constants.GEMMA_SCAM &&
+                    it.gemmaConfidence == Constants.CONFIDENCE_LOW &&
+                    it.aiRiskPoints > 0
             } -> 10
             else -> 0
         }
