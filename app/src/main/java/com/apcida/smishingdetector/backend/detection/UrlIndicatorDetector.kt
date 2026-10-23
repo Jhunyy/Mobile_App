@@ -1,36 +1,30 @@
 package com.apcida.smishingdetector.backend.detection
 
 import com.apcida.smishingdetector.model.entity.Keyword
-import java.net.URI
 
 /** Adds URL evidence even when a URL is not in the seeded domain list. */
 object UrlIndicatorDetector {
-    private val urlPattern = Regex("""(?i)\b(?:https?://|www\.)[^\s<>\"']+""")
     private val ipAddress = Regex("""^\d{1,3}(?:\.\d{1,3}){3}$""")
 
-    fun detect(messageBody: String, existingMatches: List<Keyword>): List<Keyword> {
+    fun detect(messageBody: String, existingMatches: List<Keyword>): List<Keyword> =
+        detect(UrlCandidates.extract(messageBody), existingMatches)
+
+    fun detect(urls: List<UrlCandidates.Candidate>, existingMatches: List<Keyword>): List<Keyword> {
         val existingPatterns = existingMatches
             .filter { it.patternType == "URL_PATTERN" }
-            .map { it.pattern.lowercase() }
+            .map { it.pattern }
 
-        return urlPattern.findAll(messageBody)
-            .mapNotNull { match ->
-                val rawUrl = match.value.trimEnd('.', ',', ')', ']', '!', '?')
-                if (existingPatterns.any { rawUrl.contains(it, ignoreCase = true) }) {
+        return urls.asSequence()
+            .mapNotNull { url ->
+                val host = url.host
+                if (existingPatterns.any { UrlCandidates.matchesHost(host, it) }) {
                     return@mapNotNull null
                 }
 
-                val parseable = if (rawUrl.startsWith("www.", ignoreCase = true)) {
-                    "https://$rawUrl"
-                } else {
-                    rawUrl
-                }
-                val host = runCatching { URI(parseable).host?.lowercase() }.getOrNull()
-                    ?: return@mapNotNull null
                 val suspicious = host.startsWith("xn--") ||
                     ipAddress.matches(host) ||
                     host.count { it == '-' } >= 2 ||
-                    parseable.substringAfter("://", "").substringBefore('/').contains('@')
+                    url.hasUserInfo
 
                 Keyword(
                     keywordId = 0,

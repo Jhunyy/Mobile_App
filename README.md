@@ -5,32 +5,32 @@ Android application for detecting SMS phishing ("smishing") messages using a two
 ## How Detection Works
 
 **Stage 1 — Keyword Analysis**
-Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a risk score. When contact names are enabled and the sender number matches a saved contact, the score drops by up to 5 points without changing its preliminary risk level. Contact membership does not verify sender identity.
+Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a preliminary risk score. The score is not reduced for saved contacts. When contact names are enabled, contact membership is stored for the final verdict; it does not verify sender identity.
 
 **Stage 2 — On-Device LLM Validation**
-Every incoming message is passed to Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords, for a contextual classification, confidence score, and rationale.
+Every non-duplicate incoming message is queued for Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords, for a contextual classification, confidence score, and rationale.
 
 ```
 SMS received
     │
     ▼
-Stage 1: KeywordEngine → RiskScorer → ContactRiskAdjustment → ThresholdEvaluator
+Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
     │
-    └── every message, regardless of score
+    └── every non-duplicate message, regardless of score
             │
             ▼
         Stage 2: GemmaValidator (PromptBuilder → on-device inference → GemmaOutputParser)
             │
             ▼
-        FinalVerdictResolver (keyword risk + Gemma result)
+        FinalVerdictResolver (rule risk + Gemma result + contact and rule-signal evidence)
             │
             ▼
         DetectionResult (SAFE / SUSPICIOUS / SCAM + rationale)
 ```
 
-Repeated message text is analyzed when received again outside the short duplicate-broadcast window. Gemma loads on demand and inference is serialized for overlapping messages. If the model is unavailable or inference fails, the keyword risk level is retained and the Gemma result records that analysis was unavailable.
+Repeated message text is analyzed when received again outside the short duplicate-broadcast window. Gemma loads on demand and inference is serialized for overlapping messages. If the model is unavailable or inference fails, rule-SCAM remains SCAM, rule-SUSPICIOUS remains SUSPICIOUS, and rule-SAFE is marked SUSPICIOUS for review. The Gemma result records that analysis was unavailable.
 
-Keywords match complete phrases, and URL indicators are checked locally. The final decision retains a SUSPICIOUS result when a high keyword score conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
+Keywords match complete phrases, and URL patterns are matched against extracted hosts. A saved contact can clear a rule-SUSPICIOUS result only when Gemma reports LEGITIMATE with HIGH confidence and no strong rule signal was found. A rule-SCAM result stays flagged when it conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
 
 All SMS processing happens on-device. No raw SMS content is ever transmitted off the device — only anonymized metadata is sent when a user submits a report.
 
@@ -57,7 +57,7 @@ app/src/main/java/com/apcida/smishingdetector/
 │   └── SafetyTipController.kt
 │
 ├── backend/
-│   ├── detection/                # KeywordEngine, UrlPatternScanner, RiskScorer, ThresholdEvaluator
+│   ├── detection/                # KeywordEngine, UrlCandidates, RiskScorer, FinalVerdictResolver
 │   ├── gemma/                    # GemmaValidator, PromptBuilder, GemmaOutputParser
 │   ├── receiver/                 # SmsReceiver (BroadcastReceiver)
 │   ├── repository/               # CRUD repositories for each Room entity
@@ -73,10 +73,11 @@ app/src/main/java/com/apcida/smishingdetector/
 | File | Responsibility |
 |---|---|
 | `SmsReceiver.kt` | Listens for incoming SMS, forwards to `SmsController` |
-| `SmsController.kt` | Runs keywords and then Gemma for every received message; saves results and raises scam alerts |
-| `KeywordEngine.kt` | Tokenizes message, matches against `KeywordRepository` |
+| `SmsController.kt` | Saves rule results, queues Gemma work, and persists final verdicts and alerts |
+| `KeywordEngine.kt` | Loads active patterns from the keyword DAO and matches message phrases and URL hosts |
 | `RiskScorer.kt` | Sums weights of matched keywords/patterns into a risk score |
 | `ThresholdEvaluator.kt` | Maps the keyword score to a preliminary risk level; does not gate Gemma |
+| `FinalVerdictResolver.kt` | Combines the rule result, Gemma result, and saved-contact evidence into the final verdict |
 | `GemmaValidator.kt` | Loads Gemma via MediaPipe LLM Inference API, runs on-device inference |
 | `PromptBuilder.kt` | Builds the structured prompt (system instruction + message + keywords) |
 | `GemmaOutputParser.kt` | Parses Gemma's output into classification, confidence, and reason |

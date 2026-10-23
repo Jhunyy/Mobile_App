@@ -14,8 +14,8 @@ class KeywordEngine(private val keywordDao: KeywordDao) {
      * Analyzes the message body against all active keywords
      * in the database and returns a list of matched keywords.
      *
-     * Matching is case-insensitive and checks if the pattern
-     * exists anywhere within the message body.
+     * Phrase patterns are checked in the message body; URL patterns
+     * are checked only against hosts extracted from links or bare domains.
      */
     suspend fun analyze(messageBody: String): List<Keyword> {
         Log.d(TAG, "Analyzing normalized SMS content.")
@@ -23,17 +23,23 @@ class KeywordEngine(private val keywordDao: KeywordDao) {
         // Load all active keywords from database
         val allKeywords = keywordDao.getAllActiveKeywords()
         Log.d(TAG, "Loaded ${allKeywords.size} active keywords from database.")
+        val urls = UrlCandidates.extract(messageBody)
 
         // Find all keywords that appear in the message
         val matched = mutableListOf<Keyword>()
 
         for (keyword in allKeywords) {
-            if (KeywordPatternMatcher.matches(messageBody, keyword.pattern, keyword.patternType)) {
+            val matches = if (keyword.patternType == "URL_PATTERN") {
+                urls.any { UrlCandidates.matchesHost(it.host, keyword.pattern) }
+            } else {
+                KeywordPatternMatcher.matches(messageBody, keyword.pattern, keyword.patternType)
+            }
+            if (matches) {
                 matched.add(keyword)
             }
         }
 
-        matched.addAll(UrlIndicatorDetector.detect(messageBody, matched))
+        matched.addAll(UrlIndicatorDetector.detect(urls, matched))
 
         Log.d(TAG, "Total matches found: ${matched.size}")
         return matched

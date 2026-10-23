@@ -33,6 +33,12 @@ class AlwaysOnFusionPolicyTest {
     }
 
     @Test
+    fun ruleSafeAndLowConfidenceScam_isSuspicious() {
+        val lowConfidenceScam = scam().copy(confidence = Constants.CONFIDENCE_LOW)
+        assertVerdict(RiskLevel.SAFE, lowConfidenceScam, RiskLevel.SUSPICIOUS, true)
+    }
+
+    @Test
     fun ruleSuspiciousAndAiLegitimate_remainsSuspicious() {
         assertVerdict(RiskLevel.SUSPICIOUS, legitimate(), RiskLevel.SUSPICIOUS, true)
     }

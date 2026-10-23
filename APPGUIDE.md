@@ -31,15 +31,18 @@ SmsReceiver
 SmsController
     |
     v
-KeywordEngine -> RiskScorer -> ContactRiskAdjustment -> ThresholdEvaluator
+KeywordEngine -> RiskScorer -> ThresholdEvaluator
     |
-    +-- every message, regardless of score:
+    +-- every non-duplicate message, regardless of score:
             |
             v
         GemmaValidator
             |
             v
         GemmaOutputParser
+            |
+            v
+        FinalVerdictResolver
             |
             v
         update saved Message result
@@ -51,7 +54,7 @@ Stage 1 risk reference:
 const val RISK_THRESHOLD = 60f
 ```
 
-Every newly saved message proceeds to Gemma, including messages with no keyword matches. Duplicate broadcasts within a short window are suppressed, while later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment. Gemma loads on demand, serializes inference, and preserves keyword risk when contextual analysis is unavailable.
+Every newly saved non-duplicate message is queued for Gemma, including messages with no keyword matches. Later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment and is not discounted for saved contacts. A saved contact can clear a rule-SUSPICIOUS result only with HIGH-confidence LEGITIMATE Gemma analysis and no strong rule signal. Gemma loads on demand and serializes inference. If contextual analysis is unavailable, rule-SAFE becomes SUSPICIOUS for review while rule-SUSPICIOUS and rule-SCAM retain their levels.
 
 ## Current Architecture
 
@@ -104,6 +107,7 @@ app/src/main/java/com/apcida/smishingdetector/
 | `KeywordEngine.kt` | Loads active keywords from Room and performs case-insensitive pattern matching. |
 | `RiskScorer.kt` | Computes the total risk score from matched keyword weights. |
 | `ThresholdEvaluator.kt` | Maps score to preliminary risk level; does not gate Gemma. |
+| `FinalVerdictResolver.kt` | Combines rule risk, Gemma's result, and saved-contact evidence into a final verdict. |
 | `GemmaValidator.kt` | Loads the `.task` model, runs MediaPipe inference, and falls back safely if unavailable. |
 | `PromptBuilder.kt` | Builds the structured LLM prompt from SMS content and matched keywords. |
 | `GemmaOutputParser.kt` | Parses Gemma output into classification, confidence, and rationale. |

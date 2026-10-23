@@ -14,6 +14,8 @@ import com.apcida.smishingdetector.util.Constants
  * - HIGH/MEDIUM confidence SCAM can strongly influence the result.
  * - LOW confidence SCAM cannot independently produce a full SCAM verdict.
  * - LEGITIMATE Gemma results cannot blindly erase strong rule-based evidence.
+ * - A saved contact can clear a suspicious rule result only with high-confidence
+ *   LEGITIMATE analysis and no strong rule signal.
  * - LOW-confidence LEGITIMATE results are treated cautiously.
  * - Failed/unavailable Gemma analysis falls back to the rule-based result.
  */
@@ -31,9 +33,14 @@ object FinalVerdictResolver {
         UNKNOWN
     }
 
+    fun resolve(ruleRiskLevel: RiskLevel, gemmaResult: GemmaResult): Verdict =
+        resolve(ruleRiskLevel, gemmaResult, isSavedContact = false, hasStrongRuleSignal = false)
+
     fun resolve(
         ruleRiskLevel: RiskLevel,
-        gemmaResult: GemmaResult
+        gemmaResult: GemmaResult,
+        isSavedContact: Boolean,
+        hasStrongRuleSignal: Boolean
     ): Verdict {
 
         /*
@@ -58,7 +65,8 @@ object FinalVerdictResolver {
             Constants.GEMMA_LEGITIMATE -> {
                 resolveGemmaLegitimate(
                     ruleRiskLevel = ruleRiskLevel,
-                    confidence = confidence
+                    confidence = confidence,
+                    canClearContact = isSavedContact && !hasStrongRuleSignal
                 )
             }
 
@@ -138,17 +146,15 @@ object FinalVerdictResolver {
      */
     private fun resolveGemmaLegitimate(
         ruleRiskLevel: RiskLevel,
-        confidence: Confidence
+        confidence: Confidence,
+        canClearContact: Boolean
     ): Verdict {
 
         return when (confidence) {
 
             /*
-             * HIGH-confidence legitimate analysis may clear
-             * a message only when the rules also consider it SAFE.
-             *
-             * If the rule engine found suspicious/scam evidence,
-             * keep the message flagged as SUSPICIOUS.
+             * A saved contact can clear SUSPICIOUS evidence only when
+             * no strong rule signal was found. SCAM evidence stays flagged.
              */
             Confidence.HIGH -> {
 
@@ -161,7 +167,11 @@ object FinalVerdictResolver {
                         )
                     }
 
-                    RiskLevel.SUSPICIOUS,
+                    RiskLevel.SUSPICIOUS -> {
+                        if (canClearContact) Verdict(RiskLevel.SAFE, isFlagged = false)
+                        else Verdict(RiskLevel.SUSPICIOUS, isFlagged = true)
+                    }
+
                     RiskLevel.SCAM -> {
                         Verdict(
                             RiskLevel.SUSPICIOUS,

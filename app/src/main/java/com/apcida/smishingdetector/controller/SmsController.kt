@@ -5,10 +5,10 @@ import android.util.Log
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.detection.AiEligibilityPolicy
-import com.apcida.smishingdetector.backend.detection.ContactRiskAdjustment
 import com.apcida.smishingdetector.backend.detection.DuplicatePolicy
 import com.apcida.smishingdetector.backend.detection.FinalVerdictResolver
 import com.apcida.smishingdetector.backend.detection.KeywordEngine
+import com.apcida.smishingdetector.backend.detection.MessageSignals
 import com.apcida.smishingdetector.backend.detection.RiskScorer
 import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
@@ -89,9 +89,8 @@ class SmsController(context: Context) {
         } else {
             false
         }
-        val riskScore = ContactRiskAdjustment.apply(
-            riskScorer.compute(matchedKeywords), isSavedContact
-        )
+        val riskScore = riskScorer.compute(matchedKeywords)
+        val hasStrongRuleSignal = MessageSignals.hasStrongRuleSignal(messageBody, matchedKeywords)
         val ruleRiskLevel = thresholdEvaluator.evaluate(riskScore)
         val indicators = matchedKeywords.map { it.pattern }.distinct()
 
@@ -101,6 +100,8 @@ class SmsController(context: Context) {
             riskLevel = ruleRiskLevel.name,
             deterministicRiskLevel = ruleRiskLevel.name,
             matchedIndicators = indicators.joinToString("\n"),
+            isSavedContact = isSavedContact,
+            hasStrongRuleSignal = hasStrongRuleSignal,
             isFlagged = ruleRiskLevel != RiskLevel.SAFE,
             finalClassification = ruleRiskLevel.name,
             processingState = ProcessingState.RULE_ANALYZED.name
@@ -166,7 +167,12 @@ class SmsController(context: Context) {
         } ?: GemmaResult.fallback("Gemma inference timed out.")
 
         val finalVerdict = if (gemmaResult.isSuccessful || finalAttempt) {
-            FinalVerdictResolver.resolve(ruleRiskLevel, gemmaResult)
+            FinalVerdictResolver.resolve(
+                ruleRiskLevel,
+                gemmaResult,
+                isSavedContact = message.isSavedContact,
+                hasStrongRuleSignal = message.hasStrongRuleSignal
+            )
         } else {
             FinalVerdictResolver.Verdict(ruleRiskLevel, ruleRiskLevel != RiskLevel.SAFE)
         }

@@ -1,6 +1,6 @@
 # Detection evaluation plan
 
-The app runs keyword analysis and on-device Gemma on **every received SMS**. Keyword risk is preliminary; `DecisionEngine` produces the final SAFE, SUSPICIOUS, or SCAM result. In the UI, SAFE means **no scam indicators found**, not verified genuine.
+The app runs rule analysis for each non-duplicate received SMS and queues on-device Gemma analysis. The rule risk is preliminary; `FinalVerdictResolver` combines it with Gemma's result to produce the final SAFE, SUSPICIOUS, or SCAM verdict. In the UI, SAFE means the active policy did not flag the message, not that its sender was verified.
 
 ## Ground truth
 
@@ -16,7 +16,7 @@ Record for each message: a stable ID, redacted text, language (English, Filipino
 
 Include hard legitimate examples: routine OTP delivery, bank notices, delivery updates, appointment reminders, and promotional messages. Include scam examples with unfamiliar wording and no seeded keyword. Do not label a message SCAM solely because it has an unfamiliar domain, poor grammar, urgency, or a brand name.
 
-Evaluate the up-to-5-point saved-contact discount before treating that weight as calibrated. Test routine messages, spoofed numbers, and risky requests from saved contacts. Contact membership does not establish sender authenticity, and the discount must not move a message into a safer risk band.
+Evaluate the saved-contact verdict override separately. The raw rule score is unchanged. A rule-SUSPICIOUS message can become SAFE only when the sender was a saved contact at intake, Gemma returns LEGITIMATE with HIGH confidence, and the rule pass found no strong signal: a credential or payment request, or a URL indicator weighted at least 30. Test routine messages, spoofed numbers, risky requests, and suspicious links from saved contacts. Contact membership does not establish sender authenticity.
 
 ## Evaluation method
 
@@ -28,8 +28,8 @@ Evaluate the up-to-5-point saved-contact discount before treating that weight as
 
 Gemma's HIGH/MEDIUM/LOW field is self-reported and must not be interpreted as a measured probability. If fine-tuning is attempted, use only the training split; compare the tuned model with the original on the untouched test set and on the actual device before adopting it.
 
-Regression example: `Hi! Just reminding you that our meeting is tomorrow at 10 AM. See you then.` is SAFE when the keyword score is zero, including when Gemma gives an unsupported SCAM verdict with LOW confidence. Absence of venue or attendee names is not scam evidence. Keep this example in the fixed regression set and add varied real reminders so the system does not merely memorize one sentence.
+Regression example: `Hi! Just reminding you that our meeting is tomorrow at 10 AM. See you then.` has a rule-SAFE result when its score is zero. The final result is SAFE if Gemma returns LEGITIMATE with HIGH or MEDIUM confidence, but SUSPICIOUS if Gemma returns SCAM with LOW confidence or is unavailable. That SUSPICIOUS result is an alert-policy choice, not evidence that the reminder is a scam. Keep this example in the fixed regression set and measure its false-alert cost alongside varied real reminders.
 
 ## Known implementation limit
 
-`SmsReceiver` currently launches a coroutine after receiving a broadcast. A long model run may outlive the receiver's allowed processing window. Move long analysis into durable background work and verify receipt-to-result behavior with the app closed before claiming reliable detection of every delivered SMS.
+`SmsReceiver` uses `goAsync()` for rule analysis and queues Gemma through `SmsProcessingWorker`. Verify that rule intake and worker enqueueing finish within the broadcast's allowed processing window on the target phone, including when the app is closed, before claiming reliable detection of every delivered SMS.

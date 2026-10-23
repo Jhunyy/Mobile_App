@@ -6,7 +6,7 @@ object KeywordPatternMatcher {
         if (candidate.isEmpty()) return false
 
         if (patternType == "URL_PATTERN") {
-            return messageBody.contains(candidate, ignoreCase = true)
+            return UrlCandidates.extract(messageBody).any { UrlCandidates.matchesHost(it.host, candidate) }
         }
 
         val boundedPattern = Regex(

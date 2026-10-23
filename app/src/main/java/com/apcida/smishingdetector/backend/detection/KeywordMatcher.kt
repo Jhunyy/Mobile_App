@@ -1,23 +1,11 @@
 package com.apcida.smishingdetector.backend.detection
 
 import com.apcida.smishingdetector.model.entity.Keyword
-import java.net.URI
 
 /** Matches complete phrases and URL hosts, avoiding matches inside unrelated words. */
 object KeywordMatcher {
-    private val urlRegex = Regex(
-        "(?i)(?<![@\\p{L}\\p{N}-])(?:https?://)?(?:[a-z0-9-]+\\.)+[a-z]{2,}(?::\\d+)?(?:/[^\\s<>()]*)?"
-    )
-
     fun match(message: String, keywords: List<Keyword>): List<Keyword> {
-        val hosts = urlRegex.findAll(message).mapNotNull { candidate ->
-            val url = candidate.value.trimEnd('.', ',', ';', ':', '!', '?', ')', ']')
-            runCatching {
-                URI(if (url.startsWith("http://", ignoreCase = true) ||
-                    url.startsWith("https://", ignoreCase = true)) url else "https://$url")
-                    .host?.lowercase()
-            }.getOrNull()
-        }.toList()
+        val hosts = UrlCandidates.extract(message).map { it.host }
 
         val phraseMatches = keywords.asSequence()
             .filter { it.isActive && it.patternType == "KEYWORD" && it.pattern.isNotBlank() }
@@ -44,13 +32,7 @@ object KeywordMatcher {
             if (!keyword.isActive || keyword.patternType != "URL_PATTERN") return@filter false
             val pattern = keyword.pattern.trim().lowercase()
             if (pattern.isEmpty()) return@filter false
-            hosts.any { host ->
-                when {
-                    pattern.startsWith(".") -> host.endsWith(pattern)
-                    pattern.contains('.') -> host == pattern || host.endsWith(".$pattern")
-                    else -> host.split('.').any { it == pattern }
-                }
-            }
+            hosts.any { host -> UrlCandidates.matchesHost(host, pattern) }
         }
 
         return selectedPhrases + urlMatches

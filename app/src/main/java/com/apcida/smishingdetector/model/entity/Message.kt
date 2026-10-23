@@ -38,6 +38,12 @@ data class Message(
     @ColumnInfo(name = "matched_indicators", defaultValue = "''")
     val matchedIndicators: String = "",
 
+    @ColumnInfo(name = "is_saved_contact", defaultValue = "0")
+    val isSavedContact: Boolean = false,
+
+    @ColumnInfo(name = "has_strong_rule_signal", defaultValue = "0")
+    val hasStrongRuleSignal: Boolean = false,
+
     @ColumnInfo(name = "is_flagged")
     val isFlagged: Boolean = false,
 
