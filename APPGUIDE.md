@@ -9,7 +9,7 @@ Target completion: December 2026
 
 ## What The App Does
 
-KA-SDS listens for incoming SMS messages, checks the content against a local keyword database, computes a risk score, and saves the result in a Room database. For every message, the app asks an on-device Gemma model to classify the message with more context.
+KA-SDS listens for incoming SMS messages, checks the content against a local keyword database, computes a rule score and a separate 0–100 combined risk point total, and saves the results in Room. For every message, the app asks an on-device Gemma model to classify the latest SMS using up to three earlier incoming messages from the same sender within 48 hours.
 
 Main user-facing areas:
 
@@ -54,7 +54,7 @@ Stage 1 risk reference:
 const val RISK_THRESHOLD = 60f
 ```
 
-Every newly saved non-duplicate message is queued for Gemma, including messages with no keyword matches. Later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment and is not discounted for saved contacts. A saved contact can clear a rule-SUSPICIOUS result only with HIGH-confidence LEGITIMATE Gemma analysis and no strong rule signal. Gemma loads on demand and serializes inference. If contextual analysis is unavailable, rule-SAFE becomes SUSPICIOUS for review while rule-SUSPICIOUS and rule-SCAM retain their levels.
+Every newly saved non-duplicate message is queued for Gemma, including messages with no keyword matches. Later messages with repeated content are analyzed. The keyword score is a preliminary risk assessment and is not discounted for saved contacts. A saved contact can clear a rule-SUSPICIOUS result only with HIGH-confidence LEGITIMATE Gemma analysis, no strong rule signal, and no combined-score warning. Gemma loads on demand and serializes inference. If contextual analysis is unavailable, rule-SAFE becomes SUSPICIOUS for review while rule-SUSPICIOUS and rule-SCAM retain their levels.
 
 ## Current Architecture
 
@@ -109,7 +109,7 @@ app/src/main/java/com/apcida/smishingdetector/
 | `ThresholdEvaluator.kt` | Maps score to preliminary risk level; does not gate Gemma. |
 | `FinalVerdictResolver.kt` | Combines rule risk, Gemma's result, and saved-contact evidence into a final verdict. |
 | `GemmaValidator.kt` | Loads the `.task` model, runs MediaPipe inference, and falls back safely if unavailable. |
-| `PromptBuilder.kt` | Builds the structured LLM prompt from SMS content and matched keywords. |
+| `PromptBuilder.kt` | Builds the structured LLM prompt from the latest SMS, matched keywords, and bounded incoming-message history. |
 | `GemmaOutputParser.kt` | Parses Gemma output into classification, confidence, and rationale. |
 | `AppDatabase.kt` | Room database with entities for messages, keywords, reports, safety tips, and message-keyword links. |
 | `DatabaseSeeder.kt` | Seeds keywords and safety tips from XML assets on first launch. |

@@ -8,7 +8,10 @@ Android application for detecting SMS phishing ("smishing") messages using a two
 Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a preliminary risk score. The score is not reduced for saved contacts. When contact names are enabled, contact membership is stored for the final verdict; it does not verify sender identity.
 
 **Stage 2 — On-Device LLM Validation**
-Every non-duplicate incoming message is queued for Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords, for a contextual classification, confidence score, and rationale.
+Every non-duplicate incoming message is queued for Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords and up to three earlier incoming SMS from the same sender within 48 hours. Short messages are still analyzed. The prompt asks Gemma to classify only the latest SMS.
+
+**Combined risk points**
+The app also records a separate 0–100 point breakdown: up to 25 from current message rules, 60 from a HIGH/MEDIUM-confidence Gemma SCAM result (30 for LOW), up to 25 from a Gemma-confirmed sender scam in the previous 24 hours (10 for an earlier LOW-confidence SCAM), and up to 5 for a concrete institution/sender mismatch. A score of 25 or more keeps an otherwise SAFE message SUSPICIOUS. The point total is not a probability and does not independently turn a message into SCAM. Saved-contact membership never subtracts points.
 
 ```
 SMS received
@@ -25,12 +28,15 @@ Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
         FinalVerdictResolver (rule risk + Gemma result + contact and rule-signal evidence)
             │
             ▼
+        CombinedRiskScorer (0–100 points; SUSPICIOUS minimum at 25)
+            │
+            ▼
         DetectionResult (SAFE / SUSPICIOUS / SCAM + rationale)
 ```
 
 Repeated message text is analyzed when received again outside the short duplicate-broadcast window. Gemma loads on demand and inference is serialized for overlapping messages. If the model is unavailable or inference fails, rule-SCAM remains SCAM, rule-SUSPICIOUS remains SUSPICIOUS, and rule-SAFE is marked SUSPICIOUS for review. The Gemma result records that analysis was unavailable.
 
-Keywords match complete phrases, and URL patterns are matched against extracted hosts. A saved contact can clear a rule-SUSPICIOUS result only when Gemma reports LEGITIMATE with HIGH confidence and no strong rule signal was found. A rule-SCAM result stays flagged when it conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
+Keywords match complete phrases, and URL patterns are matched against extracted hosts. A saved contact can clear a rule-SUSPICIOUS result only when Gemma reports LEGITIMATE with HIGH confidence, no strong rule signal was found, and the combined score does not require a SUSPICIOUS warning. A rule-SCAM result stays flagged when it conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
 
 All SMS processing happens on-device. No raw SMS content is ever transmitted off the device — only anonymized metadata is sent when a user submits a report.
 
@@ -167,7 +173,7 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 - Keyword scores determine preliminary risk: 0–29 SAFE, 30–59 SUSPICIOUS, 60+ SCAM. Every score proceeds to Gemma.
 - The reporting API sends anonymized metadata; it does not upload SMS content, sender addresses, or contact names.
 - New messages store the sender address locally so it can be shown in the inbox and detail screen. Existing messages keep "Unknown Sender" because their saved hashes cannot recover the address.
-- Contact names are optional. The inbox offers contact access once and keeps a Show/Hide contact names menu option. The app looks up only saved SMS sender numbers and does not save or upload contact names. Unknown numbers and alphanumeric sender IDs display as received. A matching contact can lower the score by up to 5 points, but cannot move a message into a safer risk band.
+- Contact names are optional. The inbox offers contact access once and keeps a Show/Hide contact names menu option. The app looks up only saved SMS sender numbers and does not save or upload contact names. Unknown numbers and alphanumeric sender IDs display as received. Contact membership does not change either numeric score; the existing final-verdict policy uses it only under strict conditions.
 
 ## Report Server Plan
 

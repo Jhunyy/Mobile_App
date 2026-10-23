@@ -42,6 +42,77 @@ interface MessageDao {
     @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before")
     suspend fun getStaleAiMessageIds(before: Long): List<Long>
 
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE sender_hash = :senderHash
+          AND received_at >= :notBefore
+          AND (received_at < :receivedAt OR (received_at = :receivedAt AND message_id < :messageId))
+        ORDER BY received_at DESC, message_id DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun getPreviousMessages(
+        senderHash: String,
+        notBefore: Long,
+        receivedAt: Long,
+        messageId: Long,
+        limit: Int
+    ): List<Message>
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE sender_hash = :senderHash
+          AND received_at >= :notBefore
+          AND (received_at < :receivedAt OR (received_at = :receivedAt AND message_id < :messageId))
+          AND ai_analysis_status = 'AVAILABLE'
+          AND gemma_classification = 'SCAM'
+          AND ((final_classification = 'SCAM' AND gemma_confidence IN ('HIGH', 'MEDIUM'))
+               OR gemma_confidence = 'LOW')
+        ORDER BY CASE
+            WHEN final_classification = 'SCAM' AND gemma_confidence IN ('HIGH', 'MEDIUM') THEN 0
+            ELSE 1
+        END, received_at DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getPreviousRiskMessage(
+        senderHash: String,
+        notBefore: Long,
+        receivedAt: Long,
+        messageId: Long
+    ): Message?
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE sender_hash = :senderHash
+          AND (received_at > :receivedAt OR (received_at = :receivedAt AND message_id > :messageId))
+          AND received_at <= :notAfter
+        ORDER BY received_at ASC, message_id ASC
+        """
+    )
+    suspend fun getLaterMessages(
+        senderHash: String,
+        receivedAt: Long,
+        messageId: Long,
+        notAfter: Long
+    ): List<Message>
+
+    @Query(
+        """
+        UPDATE messages
+        SET combined_risk_score = :total,
+            history_risk_points = :historyPoints,
+            risk_level = CASE WHEN final_classification = 'SAFE' AND :total >= 25 THEN 'SUSPICIOUS' ELSE risk_level END,
+            final_classification = CASE WHEN final_classification = 'SAFE' AND :total >= 25 THEN 'SUSPICIOUS' ELSE final_classification END,
+            is_flagged = CASE WHEN :total >= 25 THEN 1 ELSE is_flagged END
+        WHERE message_id = :messageId
+        """
+    )
+    suspend fun applyHistoryWarning(messageId: Long, total: Int, historyPoints: Int)
+
     // Suppress duplicate broadcasts only for the same sender/content in a
     // bounded window. A legitimate repeated SMS outside the window is kept.
     @Query(

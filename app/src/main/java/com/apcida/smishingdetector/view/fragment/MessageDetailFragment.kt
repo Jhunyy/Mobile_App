@@ -190,8 +190,22 @@ class MessageDetailFragment : Fragment() {
                 else -> "SAFE"
             }
 
-            textRiskScore.text =
-                "Risk score: ${message.riskScore.toInt()}"
+            if (message.combinedRiskScore == null) {
+                textRiskScore.text = "Rule risk score: ${message.riskScore.toInt()}"
+                textRiskBreakdown.visibility = View.GONE
+            } else {
+                textRiskScore.text = "Combined risk points: ${message.combinedRiskScore}/100"
+                val reasons = buildList {
+                    if (message.ruleRiskPoints > 0) add("Message signals +${message.ruleRiskPoints}")
+                    if (message.aiRiskPoints > 0) add("Gemma +${message.aiRiskPoints}")
+                    if (message.historyRiskPoints > 0) add("Recent sender history +${message.historyRiskPoints}")
+                    if (message.senderRiskPoints > 0) add("Sender mismatch +${message.senderRiskPoints}")
+                }
+                textRiskBreakdown.text = if (reasons.isEmpty()) {
+                    "No scored risk signals found. This is not a guarantee of safety."
+                } else reasons.joinToString(" · ")
+                textRiskBreakdown.visibility = View.VISIBLE
+            }
 
             // ---------------------------------
             // Risk badge and sender avatar
@@ -260,7 +274,11 @@ class MessageDetailFragment : Fragment() {
                             "The AI suggested scam, but the available evidence did not justify a scam alert. ${message.gemmaRationale}"
                         message.finalClassification == Constants.RISK_SUSPICIOUS &&
                             message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
-                            "Keyword indicators remain; verify independently. ${message.gemmaRationale}"
+                            if (message.historyRiskPoints > 0) {
+                                "Recent messages from this sender keep this SMS under review. ${message.gemmaRationale}"
+                            } else {
+                                "Message indicators remain; verify independently. ${message.gemmaRationale}"
+                            }
                         else -> message.gemmaRationale
                     }
 

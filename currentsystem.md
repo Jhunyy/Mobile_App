@@ -1,0 +1,51 @@
+# Current SMS detection and confidence system
+
+Static code review, 22 October 2026. This describes the path currently called for incoming SMS. It does not measure detection accuracy or validate any particular SMS as fraudulent.
+
+## The three different outputs
+
+| Field | Meaning | Current behavior |
+| --- | --- | --- |
+| `riskScore` | Numeric **rule score** from matched keywords and URL indicators | Starts at 0; it is not a probability, percentage, or overall scam confidence. It can remain 0 after an AI SCAM verdict. |
+| `gemmaConfidence` | Gemma's own `HIGH`, `MEDIUM`, or `LOW` label | A self-reported qualitative label, not a measured probability. The active final-verdict resolver does **not** use it to change the result. |
+| `finalClassification` / `riskLevel` | Combined `SAFE`, `SUSPICIOUS`, or `SCAM` verdict | Controls the message badge and flagged status after AI completes. It can differ from the band implied by `riskScore`. |
+
+See [Message.kt](app/src/main/java/com/apcida/smishingdetector/model/entity/Message.kt), [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt), and [FinalVerdictResolver.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/FinalVerdictResolver.kt).
+
+## Actual incoming SMS flow
+
+1. The receiver assembles SMS parts, and the controller stores a new message. A repeat with the same sender and content within ten minutes reuses the earlier record and does not start another AI analysis. [SmsReceiver.kt](app/src/main/java/com/apcida/smishingdetector/backend/receiver/SmsReceiver.kt), [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt), [DuplicatePolicy.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/DuplicatePolicy.kt)
+2. `KeywordEngine` loads active database entries, matches them against the SMS, and adds indicators for some unlisted URLs. The bundled XML supplies **84** entries: **64** `KEYWORD` and **20** `URL_PATTERN`. The XML is copied into the database on first launch, so the effective list on an existing installation is its database contents. [KeywordEngine.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/KeywordEngine.kt), [keywords_seed.xml](app/src/main/assets/keywords_seed.xml), [DatabaseSeeder.kt](app/src/main/java/com/apcida/smishingdetector/backend/database/DatabaseSeeder.kt)
+3. `RiskScorer` sums keyword weights, capped at 60, and URL weights, capped at 80, then adds them. Thus the score can reach **140**; it is not a 0–100 scale. A saved contact can subtract up to 5 without crossing below the original risk band's lower boundary. [RiskScorer.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/RiskScorer.kt), [ContactRiskAdjustment.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/ContactRiskAdjustment.kt)
+4. The score gives the preliminary rule result: below 30 is `SAFE`, 30 through 59 is `SUSPICIOUS`, and 60 or more is `SCAM` for the scores produced by the bundled weights. A rule score of at least 60 prompts an immediate warning while AI is pending. [ThresholdEvaluator.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/ThresholdEvaluator.kt), [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt)
+5. **Every new, non-duplicate SMS is queued for on-device Gemma**, including a rule score of 0. The prompt supplies the SMS and matched indicators and asks for `SCAM` or `LEGITIMATE`, a confidence label, and a reason. A strict parser accepts only those classifications and `HIGH`, `MEDIUM`, or `LOW`; malformed output, model failure, or timeout produces an unavailable fallback. The worker retries failed analysis up to three attempts. [AiEligibilityPolicy.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/AiEligibilityPolicy.kt), [PromptBuilder.kt](app/src/main/java/com/apcida/smishingdetector/backend/gemma/PromptBuilder.kt), [GemmaOutputParser.kt](app/src/main/java/com/apcida/smishingdetector/backend/gemma/GemmaOutputParser.kt), [SmsProcessingWorker.kt](app/src/main/java/com/apcida/smishingdetector/backend/worker/SmsProcessingWorker.kt)
+6. `FinalVerdictResolver` combines the preliminary rule band and the AI classification. The numeric score is **not recalculated** from the AI answer. [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt), [FinalVerdictResolver.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/FinalVerdictResolver.kt)
+
+## How the final verdict is selected
+
+| Rule result from score | Valid Gemma `LEGITIMATE` | Valid Gemma `SCAM` | AI unavailable after final attempt |
+| --- | --- | --- | --- |
+| `SAFE` (including score 0) | `SAFE`, unflagged | `SCAM`, flagged | `SUSPICIOUS`, flagged |
+| `SUSPICIOUS` | `SUSPICIOUS`, flagged | `SCAM`, flagged | `SUSPICIOUS`, flagged |
+| `SCAM` | `SUSPICIOUS`, flagged | `SCAM`, flagged | `SCAM`, flagged |
+
+During a nonfinal failed attempt, the preliminary rule verdict remains in place while the worker retries. A valid `SCAM` answer leads to `SCAM` at **any** reported confidence, including `LOW`. A valid `LEGITIMATE` answer can lower a rule `SCAM` to `SUSPICIOUS` even when its confidence is `LOW`. The active resolver checks `isSuccessful` and `classification`, not `confidence` or `rationale`. [FinalVerdictResolver.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/FinalVerdictResolver.kt), [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt)
+
+### Why a score of 0 can still be SCAM
+
+`0` means **no active rule pattern or scored URL indicator matched**. It does not mean “0% chance of scam.” For an illustrative SMS such as “Send me the code you just received,” the bundled patterns contain no exact matching phrase and there is no URL, so the rule score can be 0. If Gemma successfully classifies that SMS as `SCAM`, the stored final verdict is `SCAM` and it is flagged, while the displayed risk score remains `0`. This is a code-path example, **not** a claim that Gemma will actually classify that exact sentence as SCAM on a device. If Gemma says `LEGITIMATE`, the result is `SAFE`; if all AI attempts fail, the final result is `SUSPICIOUS`.
+
+The detail screen and notification show the numeric rule score alongside the final verdict. Thus a `SCAM` badge with “Risk score: 0” is possible and reflects two distinct signals, though the presentation can be confusing. [MessageDetailFragment.kt](app/src/main/java/com/apcida/smishingdetector/view/fragment/MessageDetailFragment.kt), [NotificationHelper.kt](app/src/main/java/com/apcida/smishingdetector/util/NotificationHelper.kt)
+
+## What the keyword score sees
+
+- The seed covers prize/reward, urgency, bank/account, personal-information, delivery, short-link, suspicious-domain, and generic action phrases. Examples include `you have won` (30), `urgent` (25), `verify your account` (20), `send your otp` (25), `bit.ly` (35), and `.xyz` (30). A single 30-point phrase makes the rule result `SUSPICIOUS`, not automatically `SCAM`. Multiple entries can add together, including overlapping phrases. [keywords_seed.xml](app/src/main/assets/keywords_seed.xml), [RiskScorer.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/RiskScorer.kt)
+- `KEYWORD` entries match case-insensitively with letter/digit boundaries. Each database entry contributes at most once per message, regardless of repeated occurrences. Phrases otherwise require the same characters and spacing. [KeywordPatternMatcher.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/KeywordPatternMatcher.kt), [KeywordEngine.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/KeywordEngine.kt)
+- Seeded `URL_PATTERN` entries currently use a case-insensitive **substring search across the whole message**; this active path does not verify that a match belongs to a URL host. An unlisted explicit `http://`, `https://`, or `www.` URL can add 10 points, or 40 for the implemented suspicious-host heuristics. An unlisted bare domain without such a prefix is not added by that generic URL detector. [KeywordPatternMatcher.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/KeywordPatternMatcher.kt), [UrlIndicatorDetector.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/UrlIndicatorDetector.kt)
+
+## Confidence and interpretation limits
+
+- Gemma's confidence has only three allowed **text labels**. There is no numeric conversion, calibration, or probability calculation in the active path. The app stores and shows the label, but the final decision ignores it. [GemmaOutputParser.kt](app/src/main/java/com/apcida/smishingdetector/backend/gemma/GemmaOutputParser.kt), [FinalVerdictResolver.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/FinalVerdictResolver.kt), [MessageDetailFragment.kt](app/src/main/java/com/apcida/smishingdetector/view/fragment/MessageDetailFragment.kt)
+- The `LOW` label on the fallback `UNCERTAIN` result means **AI analysis failed or was unavailable**, not a low-confidence legitimate/scam determination. The detail screen normally shows “AI unavailable” for that state. [GemmaResult.kt](app/src/main/java/com/apcida/smishingdetector/model/data/GemmaResult.kt), [MessageDetailFragment.kt](app/src/main/java/com/apcida/smishingdetector/view/fragment/MessageDetailFragment.kt)
+- The live controller calls `FinalVerdictResolver`. The separate `DecisionEngine` has different confidence- and text-signal-based behavior, but has no production caller in the scanned source. Its tests and parts of [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) describe that other behavior, so they should not be used to explain current message outcomes. [DecisionEngine.kt](app/src/main/java/com/apcida/smishingdetector/backend/detection/DecisionEngine.kt), [SmsController.kt](app/src/main/java/com/apcida/smishingdetector/controller/SmsController.kt)
+- This review establishes code behavior, not empirical sensitivity, specificity, or correctness of Gemma's confidence labels. A `SAFE` result means the active paths did not retain a scam warning; it does not authenticate the sender.

@@ -2,9 +2,10 @@ package com.apcida.smishingdetector.model.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "messages")
+@Entity(tableName = "messages", indices = [Index(value = ["sender_hash", "received_at"])])
 data class Message(
 
     @PrimaryKey(autoGenerate = true)
@@ -28,6 +29,21 @@ data class Message(
 
     @ColumnInfo(name = "risk_score")
     val riskScore: Float = 0f,
+
+    @ColumnInfo(name = "combined_risk_score")
+    val combinedRiskScore: Int? = null,
+
+    @ColumnInfo(name = "rule_risk_points", defaultValue = "0")
+    val ruleRiskPoints: Int = 0,
+
+    @ColumnInfo(name = "ai_risk_points", defaultValue = "0")
+    val aiRiskPoints: Int = 0,
+
+    @ColumnInfo(name = "history_risk_points", defaultValue = "0")
+    val historyRiskPoints: Int = 0,
+
+    @ColumnInfo(name = "sender_risk_points", defaultValue = "0")
+    val senderRiskPoints: Int = 0,
 
     @ColumnInfo(name = "risk_level")
     val riskLevel: String = "SAFE",

@@ -56,6 +56,38 @@ class MessageRepository(private val messageDao: MessageDao) {
         return messageDao.observeMessageById(messageId)
     }
 
+    suspend fun getPreviousMessages(
+        senderHash: String?,
+        receivedAt: Long,
+        messageId: Long,
+        windowMillis: Long,
+        limit: Int
+    ): List<Message> = if (senderHash == null) emptyList() else messageDao.getPreviousMessages(
+        senderHash, receivedAt - windowMillis, receivedAt, messageId, limit
+    )
+
+    suspend fun getPreviousRiskMessage(
+        senderHash: String?,
+        receivedAt: Long,
+        messageId: Long,
+        windowMillis: Long
+    ): Message? = if (senderHash == null) null else messageDao.getPreviousRiskMessage(
+        senderHash, receivedAt - windowMillis, receivedAt, messageId
+    )
+
+    suspend fun getLaterMessages(
+        senderHash: String?,
+        receivedAt: Long,
+        messageId: Long,
+        windowMillis: Long
+    ): List<Message> = if (senderHash == null) emptyList() else messageDao.getLaterMessages(
+        senderHash, receivedAt, messageId, receivedAt + windowMillis
+    )
+
+    suspend fun applyHistoryWarning(messageId: Long, total: Int, historyPoints: Int) {
+        messageDao.applyHistoryWarning(messageId, total, historyPoints)
+    }
+
     suspend fun findRecentDuplicate(
         senderHash: String,
         contentHash: String,

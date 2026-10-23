@@ -175,6 +175,15 @@
                     android:text="Risk score: 0"
                     android:textColor="@color/inbox_muted"
                     android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/text_risk_breakdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="@font/dm_sans_regular"
+                    android:textColor="@color/inbox_muted"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
