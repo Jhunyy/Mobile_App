@@ -189,12 +189,22 @@ class SmsController(context: Context) {
             ConversationRiskPolicy.CONTEXT_WINDOW_MILLIS,
             ConversationRiskPolicy.MAX_CONTEXT_MESSAGES
         ).asReversed().map { it.content }
+        val recentRiskMessage = messageRepository.getPreviousRiskMessage(
+            historySenderHash(message),
+            message.receivedAt,
+            message.messageId,
+            ConversationRiskPolicy.WARNING_WINDOW_MILLIS
+        )
+        val recentConfirmedScamText = recentRiskMessage?.takeIf {
+            ConversationRiskPolicy.historyPoints(listOf(it), message.receivedAt) == 25
+        }?.content
 
         val gemmaResult = withTimeoutOrNull(Constants.GEMMA_TIMEOUT_MILLIS) {
             GemmaManager.getReadyValidator(applicationContext).validate(
                 messageBody = message.content,
                 matchedKeywords = matchedIndicators,
-                conversationHistory = history
+                conversationHistory = history,
+                recentConfirmedScamText = recentConfirmedScamText
             )
         } ?: GemmaResult.fallback("Gemma inference timed out.")
 

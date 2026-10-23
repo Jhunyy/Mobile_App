@@ -214,6 +214,17 @@
                     android:textSize="15sp" />
 
                 <TextView
+                    android:id="@+id/text_recent_sender_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/dm_sans_bold"
+                    android:text="Recent sender history: A message from this sender was confirmed as a scam within 24 hours before this SMS. This history raises the risk of the latest SMS."
+                    android:textColor="@color/inbox_suspicious"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <TextView
                     android:id="@+id/text_gemma_rationale"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

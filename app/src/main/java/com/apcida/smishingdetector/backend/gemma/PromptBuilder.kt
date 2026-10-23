@@ -18,7 +18,8 @@ object PromptBuilder {
     fun build(
         messageBody: String,
         matchedKeywords: List<String>,
-        conversationHistory: List<String> = emptyList()
+        conversationHistory: List<String> = emptyList(),
+        recentConfirmedScamText: String? = null
     ): String {
         val keywordList = if (matchedKeywords.isNotEmpty()) {
             matchedKeywords.joinToString(", ") { "\"${escapeJsonString(it)}\"" }
@@ -41,6 +42,12 @@ object PromptBuilder {
             }
             .joinToString("\n")
             .ifEmpty { "none" }
+        val recentScamNote = recentConfirmedScamText?.let { previous ->
+            val bounded = previous.take(MAX_HISTORY_CHARACTERS_PER_MESSAGE)
+            "A prior SMS from this sender was classified SCAM within 24 hours before the latest SMS: \"${escapeJsonString(bounded)}\". " +
+                "Begin the Reason with this recent sender history, then explain how the latest SMS relates to it. " +
+                "The prior verdict alone does not make the latest SMS a scam."
+        }.orEmpty()
 
         return """
 Classify this SMS for smishing affecting Filipino mobile users.
@@ -49,6 +56,7 @@ Consider impersonation, urgency, requests for OTP or personal data, and suspicio
 
 Earlier incoming SMS from the same sender, oldest to newest (outgoing replies are unavailable):
 $history
+$recentScamNote
 
 Latest SMS to classify: "$untrustedMessage"
 

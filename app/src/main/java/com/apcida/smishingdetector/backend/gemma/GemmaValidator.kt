@@ -43,7 +43,8 @@ class GemmaValidator(private val context: Context) {
     suspend fun validate(
         messageBody: String,
         matchedKeywords: List<String>,
-        conversationHistory: List<String> = emptyList()
+        conversationHistory: List<String> = emptyList(),
+        recentConfirmedScamText: String? = null
     ): GemmaResult {
         return withContext(Dispatchers.IO) {
             inferenceMutex.withLock {
@@ -56,7 +57,9 @@ class GemmaValidator(private val context: Context) {
                     }
 
                     // Build structured prompt
-                    val prompt = PromptBuilder.build(messageBody, matchedKeywords, conversationHistory)
+                    val prompt = PromptBuilder.build(
+                        messageBody, matchedKeywords, conversationHistory, recentConfirmedScamText
+                    )
                     Log.d(TAG, "Prompt built. Running Gemma inference...")
 
                     var rawOutput = generateResponse(model, prompt)

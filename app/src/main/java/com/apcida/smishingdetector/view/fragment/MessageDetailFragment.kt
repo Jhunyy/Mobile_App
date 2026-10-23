@@ -233,6 +233,9 @@ class MessageDetailFragment : Fragment() {
             // Gemma AI Analysis
             // ---------------------------------
 
+            textRecentSenderHistory.visibility =
+                if (message.historyRiskPoints == 25) View.VISIBLE else View.GONE
+
             if (analysisPending) {
                 btnRetryAi.visibility = View.GONE
                 cardGemmaAnalysis.visibility = View.VISIBLE
@@ -274,7 +277,9 @@ class MessageDetailFragment : Fragment() {
                             "The AI suggested scam, but the available evidence did not justify a scam alert. ${message.gemmaRationale}"
                         message.finalClassification == Constants.RISK_SUSPICIOUS &&
                             message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
-                            if (message.historyRiskPoints > 0) {
+                            if (message.historyRiskPoints == 25) {
+                                "Gemma found no clear scam request in this SMS alone. The recent confirmed scam from this sender keeps this follow-up suspicious."
+                            } else if (message.historyRiskPoints > 0) {
                                 "Recent messages from this sender keep this SMS under review. ${message.gemmaRationale}"
                             } else {
                                 "Message indicators remain; verify independently. ${message.gemmaRationale}"

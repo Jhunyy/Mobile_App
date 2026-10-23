@@ -13,6 +13,8 @@ Every non-duplicate incoming message is queued for Gemma (running fully on-devic
 **Combined risk points**
 The app also records a separate 0–100 point breakdown: up to 25 from current message rules, 60 from a HIGH/MEDIUM-confidence Gemma SCAM result (30 for LOW), up to 25 from a Gemma-confirmed sender scam in the previous 24 hours (10 for an earlier LOW-confidence SCAM), and up to 5 for a concrete institution/sender mismatch. A score of 25 or more keeps an otherwise SAFE message SUSPICIOUS. The point total is not a probability and does not independently turn a message into SCAM. Saved-contact membership never subtracts points.
 
+When a confirmed scam from the same sender is still within the 24-hour warning window, the prompt asks Gemma to explain the latest SMS in light of that sender history. The message detail screen leads its AI analysis section with the confirmed-history warning, including if the latest SMS looks harmless alone.
+
 ```
 SMS received
     │
