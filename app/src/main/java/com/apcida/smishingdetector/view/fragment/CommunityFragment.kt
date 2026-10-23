@@ -27,6 +27,7 @@ import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.community.CommunityPolicy
 import com.apcida.smishingdetector.backend.community.CommunityRepository
 import com.apcida.smishingdetector.backend.community.CommunityScanner
+import com.apcida.smishingdetector.backend.community.CommunityScanResult
 import com.apcida.smishingdetector.backend.community.ContributionCandidate
 import com.apcida.smishingdetector.backend.community.ContributionItem
 import com.apcida.smishingdetector.backend.community.ContributionProgress
@@ -34,6 +35,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class CommunityFragment : Fragment() {
     private data class ReviewRow(val candidate: ContributionCandidate, val include: CheckBox,
@@ -123,10 +125,13 @@ class CommunityFragment : Fragment() {
         if (::progressText.isInitialized) {
             lifecycleScope.launch {
                 try {
-                    progress = repository.refresh()
-                    showProgress()
+                    val refreshed = repository.refresh()
+                    if (!scanning) {
+                        progress = refreshed
+                        showProgress()
+                    }
                 } catch (_: Exception) {
-                    status.text = "Saved progress shown. Server progress is temporarily unavailable."
+                    if (!scanning) status.text = "Saved progress shown. Server progress is temporarily unavailable."
                 }
             }
         }
@@ -158,21 +163,35 @@ class CommunityFragment : Fragment() {
         submitButton.visibility = View.GONE
         lifecycleScope.launch {
             try {
-                progress = repository.refresh()
+                progress = withTimeoutOrNull(10_000L) {
+                    try {
+                        repository.refresh()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    }
+                } ?: repository.cachedProgress()
                 showProgress()
                 if (progress.scamAccepted >= 20 && progress.safeAccepted >= 20) {
                     status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
                     return@launch
                 }
-                val candidates = CommunityScanner(requireContext().applicationContext).scan(
+                status.text = "Loading the on-device model…"
+                val result = CommunityScanner(requireContext().applicationContext).scan(
                     CommunityPolicy.remaining(progress.scamAccepted),
                     CommunityPolicy.remaining(progress.safeAccepted), repository.acceptedIds()
-                )
-                if (candidates.isEmpty()) status.text = "No eligible messages are available for review."
-                else {
-                    status.text = "Review each proposed message. Remove or edit anything you do not want to share."
-                    renderCandidates(candidates)
+                ) { scanProgress ->
+                    withContext(Dispatchers.Main) {
+                        status.text = if (scanProgress.analyzing) {
+                            "Analyzing stored SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
+                        } else {
+                            "Checked ${scanProgress.examined} stored SMS; analyzed ${scanProgress.analyzed}; found ${scanProgress.candidates} for review…"
+                        }
+                    }
                 }
+                status.text = scanResultMessage(result)
+                if (result.candidates.isNotEmpty()) renderCandidates(result.candidates)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -183,6 +202,21 @@ class CommunityFragment : Fragment() {
                 busy.visibility = View.GONE
             }
         }
+    }
+
+    private fun scanResultMessage(result: CommunityScanResult): String {
+        val summary = "Checked ${result.progress.examined} stored SMS and analyzed ${result.progress.analyzed}. "
+        val outcome = if (result.candidates.isEmpty()) "No messages qualified in this scan." else
+            "Found ${result.candidates.size} for review. Edit or remove any message before sharing."
+        val limit = when (result.stopReason) {
+            CommunityScanResult.StopReason.FINISHED -> ""
+            CommunityScanResult.StopReason.TIME_LIMIT -> " Scan stopped after three minutes. Start another scan to check older messages."
+            CommunityScanResult.StopReason.MESSAGE_LIMIT -> " Scan stopped after checking 1,000 messages. Start another scan to check older messages."
+            CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after analyzing 20 messages. Start another scan to check older messages."
+            CommunityScanResult.StopReason.MODEL_FAILURE ->
+                " On-device analysis failed three times in a row. Check that the Gemma model works on this phone."
+        }
+        return summary + outcome + limit
     }
 
     private fun renderCandidates(candidates: List<ContributionCandidate>) {
