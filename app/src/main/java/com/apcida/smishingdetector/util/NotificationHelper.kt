@@ -28,6 +28,8 @@ object NotificationHelper {
         result: DetectionResult,
         messageId: Long
     ) {
+        if (!context.getSharedPreferences(Constants.PREFS_NAME, 0)
+                .getBoolean(Constants.PREF_ALERTS_ENABLED, true)) return
         if (!canPostNotifications(context)) {
             Log.w(TAG, "Notification permission not granted. Scam alert not shown.")
             return

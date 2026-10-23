@@ -44,6 +44,16 @@
         android:label="Safety Tips"
         tools:layout="@layout/fragment_safety_tips" />
 
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.SettingsFragment"
+        android:label="Settings" />
+
+    <fragment
+        android:id="@+id/communityFragment"
+        android:name="com.apcida.smishingdetector.view.fragment.CommunityFragment"
+        android:label="Help the Community" />
+
     <!-- ── Onboarding / Permission Screen ────────────── -->
     <fragment
         android:id="@+id/onboardingFragment"

@@ -10,6 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -27,7 +28,10 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.adapter.MessageListAdapter
+import com.apcida.smishingdetector.view.widget.PullToRefreshLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -40,6 +44,7 @@ class MessagesFragment : Fragment() {
 
     private lateinit var adapter: MessageListAdapter
     private lateinit var messageRepository: MessageRepository
+    private lateinit var pullToRefresh: PullToRefreshLayout
     private var allMessages: List<Message> = emptyList()
     private var selectedFilter = InboxFilter.ALL
     private var newestFirst = true
@@ -67,7 +72,8 @@ class MessagesFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentMessagesBinding.inflate(inflater, container, false)
-        return binding.root
+        pullToRefresh = PullToRefreshLayout(requireContext()).apply { setContent(binding.root) }
+        return pullToRefresh
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -78,6 +84,7 @@ class MessagesFragment : Fragment() {
         setupRecyclerView()
         setupInboxControls()
         observeMessages()
+        setupPullToRefresh()
         offerContactNamesOnce()
     }
 
@@ -218,6 +225,28 @@ class MessagesFragment : Fragment() {
                 allMessages = messages
                 renderMessages()
                 refreshContactNames()
+            }
+        }
+    }
+
+    private fun setupPullToRefresh() {
+        pullToRefresh.canChildScrollUp = { binding.recyclerMessages.canScrollVertically(-1) }
+        pullToRefresh.setOnRefreshListener {
+            val layout = pullToRefresh
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    allMessages = messageRepository.getAllMessages().first()
+                    loadReadState()
+                    renderMessages()
+                    refreshContactNames()
+                    Toast.makeText(requireContext(), "Messages refreshed.", Toast.LENGTH_SHORT).show()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Toast.makeText(requireContext(), "Could not refresh messages.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    layout.isRefreshing = false
+                }
             }
         }
     }

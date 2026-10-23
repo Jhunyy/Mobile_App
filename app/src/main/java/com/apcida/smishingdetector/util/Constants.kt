@@ -64,4 +64,5 @@ object Constants {
     const val PREF_SMS_PERMISSION_GRANTED = "sms_permission_granted"
     const val PREF_CONTACT_NAMES_ENABLED = "contact_names_enabled"
     const val PREF_CONTACT_PROMPT_SHOWN = "contact_prompt_shown"
+    const val PREF_ALERTS_ENABLED = "alerts_enabled"
 }

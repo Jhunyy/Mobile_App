@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.apcida.smishingdetector.backend.database.AppDatabase
@@ -117,8 +118,9 @@ class SafetyTipsFragment : Fragment() {
 
         binding.textSafetyTitle.text = "Safety Tips"
 
-        binding.imgSafety.visibility = View.VISIBLE
-        binding.btnBack.visibility = View.GONE
+        binding.imgSafety.visibility = View.GONE
+        binding.btnBack.visibility = View.VISIBLE
+        binding.btnBack.contentDescription = "Back to Settings"
 
         val categories = allTips
             .groupBy { tip ->
@@ -166,6 +168,7 @@ class SafetyTipsFragment : Fragment() {
 
         binding.imgSafety.visibility = View.GONE
         binding.btnBack.visibility = View.VISIBLE
+        binding.btnBack.contentDescription = "Back to Safety Tips"
 
         val filteredTips = allTips.filter { tip ->
             normalizeCategory(tip.category)
@@ -199,6 +202,8 @@ class SafetyTipsFragment : Fragment() {
 
             if (selectedCategory != null) {
                 showCategories()
+            } else {
+                findNavController().navigateUp()
             }
         }
     }

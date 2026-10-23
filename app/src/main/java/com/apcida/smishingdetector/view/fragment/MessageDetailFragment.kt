@@ -30,6 +30,8 @@ import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
+import com.apcida.smishingdetector.view.widget.PullToRefreshLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -44,6 +46,7 @@ class MessageDetailFragment : Fragment() {
 
     private lateinit var messageRepository: MessageRepository
     private lateinit var reportRepository: ReportRepository
+    private lateinit var pullToRefresh: PullToRefreshLayout
 
     private var currentMessage: Message? = null
     private var senderName: String? = null
@@ -90,8 +93,8 @@ class MessageDetailFragment : Fragment() {
             container,
             false
         )
-
-        return binding.root
+        pullToRefresh = PullToRefreshLayout(requireContext()).apply { setContent(binding.root) }
+        return pullToRefresh
     }
 
     override fun onViewCreated(
@@ -108,6 +111,7 @@ class MessageDetailFragment : Fragment() {
         val messageId = arguments?.getLong("messageId") ?: return
 
         observeMessage(messageId)
+        setupPullToRefresh(messageId)
     }
 
     /**
@@ -150,6 +154,33 @@ class MessageDetailFragment : Fragment() {
                 currentMessage = message
                 displayMessage(message)
                 refreshSenderName()
+            }
+        }
+    }
+
+    private fun setupPullToRefresh(messageId: Long) {
+        pullToRefresh.canChildScrollUp = { binding.root.canScrollVertically(-1) }
+        pullToRefresh.setOnRefreshListener {
+            val layout = pullToRefresh
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val message = messageRepository.getMessageById(messageId)
+                    if (message == null) {
+                        Toast.makeText(requireContext(), "Message is no longer available.", Toast.LENGTH_SHORT).show()
+                        findNavController().navigateUp()
+                    } else {
+                        currentMessage = message
+                        displayMessage(message)
+                        refreshSenderName(force = true)
+                        Toast.makeText(requireContext(), "Message details refreshed.", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Toast.makeText(requireContext(), "Could not refresh message details.", Toast.LENGTH_SHORT).show()
+                } finally {
+                    layout.isRefreshing = false
+                }
             }
         }
     }

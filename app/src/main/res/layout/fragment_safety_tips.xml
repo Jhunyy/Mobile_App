@@ -30,13 +30,15 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <!-- Back button, hidden on category screen -->
+            <!-- Back to Settings or the category list -->
             <ImageView
                 android:id="@+id/btn_back"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="28dp"
-                android:padding="5dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="20dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:padding="12dp"
                 android:src="@drawable/ic_arrow_back"
                 android:visibility="gone"
                 app:tint="@color/text_primary"

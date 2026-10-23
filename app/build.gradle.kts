@@ -20,6 +20,9 @@ val reportBaseUrl = System.getenv("APCIDA_REPORT_BASE_URL")
 val reportApiKey = System.getenv("APCIDA_REPORT_API_KEY")
     ?: localProperties.getProperty("apcida.reportApiKey")
     ?: ""
+val communityApiKey = System.getenv("APCIDA_COMMUNITY_API_KEY")
+    ?: localProperties.getProperty("apcida.communityApiKey")
+    ?: ""
 
 android {
     namespace = "com.apcida.smishingdetector"
@@ -34,6 +37,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "REPORT_BASE_URL", buildConfigString(reportBaseUrl))
         buildConfigField("String", "REPORT_API_KEY", buildConfigString(reportApiKey))
+        buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(communityApiKey))
     }
 
     buildTypes {

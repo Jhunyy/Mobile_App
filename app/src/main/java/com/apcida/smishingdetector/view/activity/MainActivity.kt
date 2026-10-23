@@ -17,6 +17,7 @@ import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
 import com.apcida.smishingdetector.util.PermissionHelper
+import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.fragment.OnboardingFragment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -158,6 +159,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        if (!getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE)
+                .getBoolean(Constants.PREF_ALERTS_ENABLED, true)) return
         if (!PermissionHelper.hasNotificationPermission(this)) {
 
             PermissionHelper.requestNotificationPermission(this)
