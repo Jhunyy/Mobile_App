@@ -51,6 +51,7 @@ class CommunityFragment : Fragment() {
     private lateinit var candidateContainer: LinearLayout
     private lateinit var startButton: Button
     private lateinit var submitButton: Button
+    private lateinit var shareStatus: TextView
     private lateinit var retryButton: Button
     private lateinit var discardButton: Button
     private lateinit var busy: ProgressBar
@@ -115,6 +116,8 @@ class CommunityFragment : Fragment() {
         body.addView(candidateContainer)
         submitButton = button("Review and Confirm Sharing") { confirmSubmission() }
         submitButton.visibility = View.GONE
+        shareStatus = label("", 14f, false, R.color.inbox_muted).apply { visibility = View.GONE }
+        body.addView(shareStatus, margin(8, 0))
         button("Cancel") { findNavController().navigateUp() }
         showProgress()
         return scroll
@@ -161,6 +164,7 @@ class CommunityFragment : Fragment() {
         candidateContainer.removeAllViews()
         rows.clear()
         submitButton.visibility = View.GONE
+        shareStatus.visibility = View.GONE
         lifecycleScope.launch {
             try {
                 progress = withTimeoutOrNull(10_000L) {
@@ -242,25 +246,35 @@ class CommunityFragment : Fragment() {
             rows += ReviewRow(candidate, include, text, categories)
         }
         submitButton.visibility = View.VISIBLE
+        if (!repository.configured()) {
+            shareStatus.text = "You can review these messages, but sharing is unavailable in this app build."
+            shareStatus.visibility = View.VISIBLE
+        }
     }
 
     private fun confirmSubmission() {
         if (!repository.configured()) {
-            status.text = "Community upload is unavailable until the research server is configured. No message has been shared."
+            val message = "Sharing is unavailable in this app build. A Community API key and research server must be configured before messages can be uploaded. No message has been shared."
+            showShareFeedback(message)
+            AlertDialog.Builder(requireContext())
+                .setTitle("Sharing unavailable")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show()
             return
         }
         if (repository.hasPending()) {
-            status.text = "A previous approved submission is pending. Retry it first."
+            showShareFeedback("A previous approved submission is pending. Retry it first.")
             return
         }
         val selected = rows.filter { it.include.isChecked }
-        if (selected.isEmpty()) { status.text = "Select at least one message to share."; return }
+        if (selected.isEmpty()) { showShareFeedback("Select at least one message to share."); return }
         val scamRemaining = CommunityPolicy.remaining(progress.scamAccepted)
         val safeRemaining = CommunityPolicy.remaining(progress.safeAccepted)
         val scamCount = selected.count { it.category.selectedItem.toString() == "SCAM" }
         val safeCount = selected.size - scamCount
         if (scamCount > scamRemaining || safeCount > safeRemaining || selected.size > 40 - progress.scamAccepted - progress.safeAccepted) {
-            status.text = "Selection exceeds your remaining contribution limits. Remove or relabel messages."
+            showShareFeedback("Selection exceeds your remaining contribution limits. Remove or relabel messages.")
             return
         }
         val edited = selected.map { row ->
@@ -269,13 +283,14 @@ class CommunityFragment : Fragment() {
                 row.category.selectedItem.toString(), System.currentTimeMillis())
         }
         if (edited.any { !CommunityPolicy.eligible(it.text) }) {
-            status.text = "A selected message is empty, too long, or contains a code or sensitive term. Edit or remove it."
+            showShareFeedback("A selected message is empty, too long, or contains a code or sensitive term. Edit or remove it.")
             return
         }
         if (edited.map { CommunityPolicy.fingerprint(it.text) }.distinct().size != edited.size) {
-            status.text = "Remove duplicate edited messages before sharing."
+            showShareFeedback("Remove duplicate edited messages before sharing.")
             return
         }
+        shareStatus.visibility = View.GONE
         AlertDialog.Builder(requireContext())
             .setTitle("Share reviewed messages?")
             .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server? The server will also receive predicted and reviewed categories, a pseudonymous ID, and timestamps. Researchers will verify the labels. This is a separate upload confirmation.")
@@ -290,7 +305,9 @@ class CommunityFragment : Fragment() {
                         retryButton.visibility = View.VISIBLE
                         discardButton.visibility = View.VISIBLE
                         submitPending()
-                    } catch (error: Exception) { status.text = error.message ?: "Unable to save approved submission." }
+                    } catch (error: Exception) {
+                        showShareFeedback(error.message ?: "Unable to save approved submission.")
+                    }
                 }
             }.show()
     }
@@ -299,17 +316,18 @@ class CommunityFragment : Fragment() {
         retryButton.isEnabled = false
         discardButton.isEnabled = false
         busy.visibility = View.VISIBLE
-        status.text = "Sending approved messages…"
+        showShareFeedback("Sending approved messages…")
         lifecycleScope.launch {
             try {
                 progress = repository.submitPending()
                 showProgress()
                 retryButton.visibility = if (repository.hasPending()) View.VISIBLE else View.GONE
                 discardButton.visibility = retryButton.visibility
-                status.text = if (repository.hasPending()) "Some approved messages remain pending. Retry later."
+                showShareFeedback(if (repository.hasPending()) "Some approved messages remain pending. Retry later."
                 else "Contribution received. Thank you for helping improve ApCiDa."
+                )
             } catch (error: Exception) {
-                status.text = (error.message ?: "Submission unavailable") + " Approved messages remain pending for retry."
+                showShareFeedback((error.message ?: "Submission unavailable") + " Approved messages remain pending for retry.")
                 retryButton.visibility = View.VISIBLE
                 discardButton.visibility = View.VISIBLE
             } finally {
@@ -318,6 +336,12 @@ class CommunityFragment : Fragment() {
                 busy.visibility = View.GONE
             }
         }
+    }
+
+    private fun showShareFeedback(message: String) {
+        status.text = message
+        shareStatus.text = message
+        shareStatus.visibility = View.VISIBLE
     }
 
     private fun showProgress() {
