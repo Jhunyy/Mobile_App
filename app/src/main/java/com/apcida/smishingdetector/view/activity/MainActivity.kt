@@ -15,6 +15,7 @@ import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.gemma.GemmaManager
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
+import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.util.Constants
@@ -154,6 +155,8 @@ class MainActivity : AppCompatActivity() {
 
             Log.d(TAG, "SMS permissions already granted.")
 
+            SmsInboxSyncWorker.enqueue(applicationContext)
+
             requestNotificationPermissionIfNeeded()
         }
     }
@@ -199,6 +202,8 @@ class MainActivity : AppCompatActivity() {
                     TAG,
                     "All SMS permissions granted."
                 )
+
+                SmsInboxSyncWorker.enqueue(applicationContext)
 
                 val navHostFragment =
                     supportFragmentManager

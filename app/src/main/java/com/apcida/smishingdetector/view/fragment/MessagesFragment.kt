@@ -20,9 +20,12 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.repository.MessageRepository
+import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import com.apcida.smishingdetector.databinding.FragmentMessagesBinding
 import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.util.ContactNameResolver
@@ -46,6 +49,7 @@ class MessagesFragment : Fragment() {
     private lateinit var messageRepository: MessageRepository
     private lateinit var pullToRefresh: PullToRefreshLayout
     private var allMessages: List<Message> = emptyList()
+    private var syncInProgress = false
     private var selectedFilter = InboxFilter.ALL
     private var newestFirst = true
     private val readMessageIds = mutableSetOf<String>()
@@ -84,6 +88,7 @@ class MessagesFragment : Fragment() {
         setupRecyclerView()
         setupInboxControls()
         observeMessages()
+        observeInboxSync()
         setupPullToRefresh()
         offerContactNamesOnce()
     }
@@ -91,6 +96,9 @@ class MessagesFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         if (::adapter.isInitialized) {
+            if (com.apcida.smishingdetector.util.PermissionHelper.hasReadSmsPermission(requireContext())) {
+                SmsInboxSyncWorker.enqueue(requireContext().applicationContext)
+            }
             updateContactsObserver()
             refreshContactNames()
         }
@@ -229,17 +237,30 @@ class MessagesFragment : Fragment() {
         }
     }
 
+    private fun observeInboxSync() {
+        WorkManager.getInstance(requireContext())
+            .getWorkInfosForUniqueWorkLiveData(SmsInboxSyncWorker.WORK_NAME)
+            .observe(viewLifecycleOwner) { work ->
+                syncInProgress = work?.any {
+                    it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING ||
+                        it.state == WorkInfo.State.BLOCKED
+                } == true
+                renderMessages()
+            }
+    }
+
     private fun setupPullToRefresh() {
         pullToRefresh.canChildScrollUp = { binding.recyclerMessages.canScrollVertically(-1) }
         pullToRefresh.setOnRefreshListener {
             val layout = pullToRefresh
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
+                    SmsInboxSyncWorker.enqueue(requireContext().applicationContext)
                     allMessages = messageRepository.getAllMessages().first()
                     loadReadState()
                     renderMessages()
                     refreshContactNames()
-                    Toast.makeText(requireContext(), "Messages refreshed.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Checking stored messages.", Toast.LENGTH_SHORT).show()
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -276,9 +297,14 @@ class MessagesFragment : Fragment() {
         val isEmpty = visibleMessages.isEmpty()
         binding.emptyState.visibility = if (isEmpty) View.VISIBLE else View.GONE
         binding.recyclerMessages.visibility = if (isEmpty) View.GONE else View.VISIBLE
-        binding.textEmptyTitle.text = if (allMessages.isEmpty()) "No messages yet" else "No matching messages"
+        binding.textEmptyTitle.text = when {
+            allMessages.isEmpty() && syncInProgress -> "Scanning stored messages…"
+            allMessages.isEmpty() -> "No messages yet"
+            else -> "No matching messages"
+        }
         binding.textEmptyDescription.text = if (allMessages.isEmpty()) {
-            "Your messages will appear here once they are detected."
+            if (syncInProgress) "Messages will appear here as they are detected."
+            else "Your messages will appear here once they are detected."
         } else {
             "Try another search or filter."
         }

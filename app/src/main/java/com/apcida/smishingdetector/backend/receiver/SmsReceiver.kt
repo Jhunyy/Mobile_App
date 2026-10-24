@@ -27,11 +27,13 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val groupedMessages = mutableMapOf<String, StringBuilder>()
+        val groupedMessages = mutableMapOf<String, Pair<StringBuilder, Long>>()
         messages.forEach { smsMessage ->
             val sender = smsMessage.originatingAddress ?: "Unknown"
-            groupedMessages.getOrPut(sender) { StringBuilder() }
-                .append(smsMessage.messageBody.orEmpty())
+            val entry = groupedMessages.getOrPut(sender) {
+                StringBuilder() to smsMessage.timestampMillis
+            }
+            entry.first.append(smsMessage.messageBody.orEmpty())
         }
 
         val pendingResult = goAsync()
@@ -39,10 +41,12 @@ class SmsReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val controller = SmsController(appContext)
-                groupedMessages.forEach { (sender, bodyBuilder) ->
-                    val body = bodyBuilder.toString().trim()
+                groupedMessages.forEach { (sender, entry) ->
+                    val body = entry.first.toString().trim()
                     if (body.isNotEmpty()) {
-                        val result = controller.receiveAndAnalyzeRules(sender, body)
+                        val result = controller.receiveAndAnalyzeRules(
+                            sender, body, entry.second.takeIf { it > 0 } ?: System.currentTimeMillis()
+                        )
                         if (result.shouldEnqueueAi) {
                             SmsProcessingWorker.enqueue(appContext, result.messageId)
                         }

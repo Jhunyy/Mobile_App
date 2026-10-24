@@ -5,7 +5,10 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "messages", indices = [Index(value = ["sender_hash", "received_at"])])
+@Entity(tableName = "messages", indices = [
+    Index(value = ["sender_hash", "received_at"]),
+    Index(value = ["source_sms_id"], unique = true)
+])
 data class Message(
 
     @PrimaryKey(autoGenerate = true)
@@ -23,6 +26,12 @@ data class Message(
 
     @ColumnInfo(name = "content_hash")
     val contentHash: String? = null,
+
+    @ColumnInfo(name = "source_sms_id")
+    val sourceSmsId: Long? = null,
+
+    @ColumnInfo(name = "alerts_enabled", defaultValue = "1")
+    val alertsEnabled: Boolean = true,
 
     @ColumnInfo(name = "received_at")
     val receivedAt: Long,

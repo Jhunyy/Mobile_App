@@ -52,6 +52,12 @@ class MessageRepository(private val messageDao: MessageDao) {
         return messageDao.getMessageById(messageId)
     }
 
+    suspend fun getMessageBySourceSmsId(sourceSmsId: Long): Message? =
+        messageDao.getMessageBySourceSmsId(sourceSmsId)
+
+    suspend fun bindSourceSmsId(messageId: Long, sourceSmsId: Long) =
+        messageDao.bindSourceSmsId(messageId, sourceSmsId)
+
     fun observeMessageById(messageId: Long): Flow<Message?> {
         return messageDao.observeMessageById(messageId)
     }
@@ -96,6 +102,17 @@ class MessageRepository(private val messageDao: MessageDao) {
     ): Message? {
         return messageDao.findRecentDuplicate(senderHash, contentHash, notBefore, receivedAt)
     }
+
+    suspend fun findMatchingStoredSms(
+        senderHash: String,
+        contentHash: String,
+        receivedAt: Long
+    ): Message? = messageDao.findMatchingStoredSms(
+        senderHash, contentHash,
+        receivedAt - com.apcida.smishingdetector.backend.detection.DuplicatePolicy.WINDOW_MILLIS,
+        receivedAt + com.apcida.smishingdetector.backend.detection.DuplicatePolicy.WINDOW_MILLIS,
+        receivedAt
+    )
 
     /**
      * Deletes all messages from the database.

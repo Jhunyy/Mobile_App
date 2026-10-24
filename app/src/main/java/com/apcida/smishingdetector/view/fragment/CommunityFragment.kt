@@ -31,6 +31,7 @@ import com.apcida.smishingdetector.backend.community.CommunityScanResult
 import com.apcida.smishingdetector.backend.community.ContributionCandidate
 import com.apcida.smishingdetector.backend.community.ContributionItem
 import com.apcida.smishingdetector.backend.community.ContributionProgress
+import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -147,7 +148,7 @@ class CommunityFragment : Fragment() {
         }
         AlertDialog.Builder(requireContext())
             .setTitle("Start local SMS scan?")
-            .setMessage("ApCiDa will examine accessible stored SMS on this device, including older messages, to find possible research contributions. This scan sends no SMS to the server. You will separately review and confirm any upload.")
+            .setMessage("ApCiDa will examine accessible stored SMS on this device, including older messages, to find possible research contributions. It will also check for messages missing from your Messages tab. This scan sends no SMS to the server. You will separately review and confirm any upload.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Start Contributing") { _, _ ->
                 if (com.apcida.smishingdetector.util.PermissionHelper.hasReadSmsPermission(requireContext())) startScan()
@@ -201,6 +202,7 @@ class CommunityFragment : Fragment() {
             } catch (error: Exception) {
                 status.text = error.message ?: "The local scan could not be completed."
             } finally {
+                context?.applicationContext?.let(SmsInboxSyncWorker::enqueue)
                 scanning = false
                 startButton.isEnabled = true
                 busy.visibility = View.GONE
@@ -220,19 +222,37 @@ class CommunityFragment : Fragment() {
             CommunityScanResult.StopReason.MODEL_FAILURE ->
                 " On-device analysis failed three times in a row. Check that the Gemma model works on this phone."
         }
-        return summary + outcome + limit
+        val resume = if (result.nextOffset > 0) {
+            " Next scan continues after the first ${result.nextOffset} stored SMS."
+        } else ""
+        return summary + outcome + limit + resume + " Checking for missed Messages in the background."
     }
 
     private fun renderCandidates(candidates: List<ContributionCandidate>) {
         candidateContainer.addView(label("Review proposed messages", 18f, true, R.color.inbox_text), margin(0, 20))
         candidates.forEach { candidate ->
             val panel = panel(candidateContainer)
-            val include = CheckBox(requireContext()).apply { text = "Include this message"; isChecked = true }
+            val include = CheckBox(requireContext()).apply {
+                text = "Include this message"
+                isChecked = true
+                setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
+            }
             panel.addView(include)
             panel.addView(label("Predicted: ${candidate.predictedCategory}", 13f, false, R.color.inbox_muted))
             val categories = Spinner(requireContext())
-            categories.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-                listOf("SCAM", "SAFE"))
+            categories.adapter = object : ArrayAdapter<String>(requireContext(),
+                android.R.layout.simple_spinner_item, listOf("SCAM", "SAFE")) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                    super.getView(position, convertView, parent).apply {
+                        (this as TextView).setTextColor(ContextCompat.getColor(context, R.color.inbox_text))
+                    }
+
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+                    super.getDropDownView(position, convertView, parent).apply {
+                        (this as TextView).setTextColor(ContextCompat.getColor(context, R.color.inbox_text))
+                        setBackgroundColor(Color.WHITE)
+                    }
+            }.apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
             categories.setSelection(if (candidate.predictedCategory == "SCAM") 0 else 1)
             panel.addView(categories)
             val text = EditText(requireContext()).apply {
@@ -241,6 +261,8 @@ class CommunityFragment : Fragment() {
                 maxLines = 8
                 textSize = 14f
                 hint = "Edit or redact this SMS before sharing"
+                setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
+                setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_muted))
             }
             panel.addView(text)
             rows += ReviewRow(candidate, include, text, categories)

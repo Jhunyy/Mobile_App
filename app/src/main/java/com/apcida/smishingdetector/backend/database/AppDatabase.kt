@@ -25,7 +25,7 @@ import com.apcida.smishingdetector.model.entity.SafetyTip
         Report::class,
         SafetyTip::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -156,6 +156,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE messages ADD COLUMN source_sms_id INTEGER")
+                database.execSQL("ALTER TABLE messages ADD COLUMN alerts_enabled INTEGER NOT NULL DEFAULT 1")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_messages_source_sms_id ON messages(source_sms_id)"
+                )
+            }
+        }
+
         // Singleton instance — only one database connection across the app
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -167,7 +177,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "kasds_database"
                 )
-                    .addMigrations(MIGRATION_1_3, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_3, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

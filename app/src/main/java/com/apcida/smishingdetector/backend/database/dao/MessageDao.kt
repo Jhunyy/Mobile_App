@@ -36,6 +36,12 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     suspend fun getMessageById(messageId: Long): Message?
 
+    @Query("SELECT * FROM messages WHERE source_sms_id = :sourceSmsId LIMIT 1")
+    suspend fun getMessageBySourceSmsId(sourceSmsId: Long): Message?
+
+    @Query("UPDATE messages SET source_sms_id = :sourceSmsId WHERE message_id = :messageId AND source_sms_id IS NULL")
+    suspend fun bindSourceSmsId(messageId: Long, sourceSmsId: Long)
+
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     fun observeMessageById(messageId: Long): Flow<Message?>
 
@@ -130,6 +136,23 @@ interface MessageDao {
         senderHash: String,
         contentHash: String,
         notBefore: Long,
+        receivedAt: Long
+    ): Message?
+
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE sender_hash = :senderHash AND content_hash = :contentHash
+          AND received_at BETWEEN :notBefore AND :notAfter
+        ORDER BY ABS(received_at - :receivedAt) ASC
+        LIMIT 1
+        """
+    )
+    suspend fun findMatchingStoredSms(
+        senderHash: String,
+        contentHash: String,
+        notBefore: Long,
+        notAfter: Long,
         receivedAt: Long
     ): Message?
 

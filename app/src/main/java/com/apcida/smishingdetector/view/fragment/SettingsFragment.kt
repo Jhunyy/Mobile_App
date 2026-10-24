@@ -27,6 +27,7 @@ import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.PermissionHelper
+import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 
 class SettingsFragment : Fragment() {
     private lateinit var smsSwitch: SwitchCompat
@@ -35,6 +36,9 @@ class SettingsFragment : Fragment() {
     private lateinit var contactsSwitch: SwitchCompat
 
     private val requestSms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (PermissionHelper.hasReadSmsPermission(requireContext())) {
+            SmsInboxSyncWorker.enqueue(requireContext().applicationContext)
+        }
         refreshSwitches()
     }
     private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {

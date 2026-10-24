@@ -50,35 +50,51 @@ class SmsController(context: Context) {
     suspend fun receiveAndAnalyzeRules(
         sender: String,
         messageBody: String,
-        receivedAt: Long = System.currentTimeMillis()
+        receivedAt: Long = System.currentTimeMillis(),
+        sourceSmsId: Long? = null,
+        alertOnDetection: Boolean = true
     ): IntakeResult {
         DatabaseSeeder(applicationContext, database).seedIfFirstLaunch()
 
         val senderHash = HashUtil.hashSender(sender)
         val contentHash = HashUtil.hashContent(messageBody)
-        val duplicate = messageRepository.findRecentDuplicate(
-            senderHash,
-            contentHash,
-            DuplicatePolicy.windowStart(receivedAt),
-            receivedAt
-        )
+        val duplicate = if (sourceSmsId != null) {
+            messageRepository.getMessageBySourceSmsId(sourceSmsId)
+                ?: messageRepository.findMatchingStoredSms(senderHash, contentHash, receivedAt)
+        } else {
+            messageRepository.findRecentDuplicate(
+                senderHash, contentHash, DuplicatePolicy.windowStart(receivedAt), receivedAt
+            )
+        }
         if (duplicate != null) {
-            Log.d(TAG, "Suppressed a duplicate SMS broadcast within the time window.")
-            return IntakeResult(duplicate.messageId, shouldEnqueueAi = false)
+            if (sourceSmsId != null && duplicate.sourceSmsId == null) {
+                messageRepository.bindSourceSmsId(duplicate.messageId, sourceSmsId)
+            }
+            if (duplicate.processingState != ProcessingState.PENDING.name) {
+                Log.d(TAG, "Suppressed a duplicate SMS.")
+                return IntakeResult(duplicate.messageId,
+                    shouldEnqueueAi = duplicate.processingState == ProcessingState.AI_QUEUED.name)
+            }
+            Log.d(TAG, "Resuming rules for a pending SMS.")
         }
 
         val senderAddress = sender.takeIf { it.isNotBlank() && it != "Unknown" }
-        val pendingMessage = Message(
-            senderHash = senderHash,
-            senderAddress = senderAddress,
-            content = messageBody,
-            contentHash = contentHash,
-            receivedAt = receivedAt,
+        val newMessage = Message(
+            senderHash = senderHash, senderAddress = senderAddress, content = messageBody,
+            contentHash = contentHash, sourceSmsId = sourceSmsId,
+            alertsEnabled = alertOnDetection, receivedAt = receivedAt,
             processingState = ProcessingState.PENDING.name,
             aiAnalysisStatus = AiAnalysisStatus.NOT_STARTED.name
         )
-        val messageId = messageRepository.insertMessage(pendingMessage)
+        val messageId = duplicate?.messageId ?: messageRepository.insertMessage(newMessage)
+        if (messageId <= 0 && sourceSmsId != null) {
+            val existing = messageRepository.getMessageBySourceSmsId(sourceSmsId)
+            if (existing != null) return IntakeResult(existing.messageId,
+                shouldEnqueueAi = existing.processingState == ProcessingState.AI_QUEUED.name)
+        }
         require(messageId > 0) { "Failed to persist incoming SMS." }
+        val pendingMessage = duplicate?.copy(sourceSmsId = duplicate.sourceSmsId ?: sourceSmsId)
+            ?: newMessage
 
         val matchedKeywords = keywordEngine.analyze(messageBody)
         val isSavedContact = if (senderAddress != null &&
@@ -143,14 +159,14 @@ class SmsController(context: Context) {
         messageRepository.updateMessage(queuedMessage)
         refreshOwnHistoryWarning(messageId)
 
-        if (thresholdEvaluator.isHighRisk(riskScore)) {
+        if (pendingMessage.alertsEnabled && thresholdEvaluator.isHighRisk(riskScore)) {
             showAlert(
                 message = queuedMessage,
                 riskLevel = ruleRiskLevel,
                 matchedKeywords = matchedKeywords,
                 rationale = "High-risk deterministic indicators were detected; AI analysis is pending."
             )
-        } else if (historyPoints == 25 && ruleRiskLevel == RiskLevel.SAFE) {
+        } else if (pendingMessage.alertsEnabled && historyPoints == 25 && ruleRiskLevel == RiskLevel.SAFE) {
             showAlert(
                 message = queuedMessage,
                 riskLevel = RiskLevel.SUSPICIOUS,
@@ -270,7 +286,7 @@ class SmsController(context: Context) {
             refreshLaterWarnings(completedMessage)
         }
 
-        if (gemmaResult.isSuccessful &&
+        if (message.alertsEnabled && gemmaResult.isSuccessful &&
             (finalRiskLevel == RiskLevel.SCAM || ruleRiskLevel == RiskLevel.SCAM)
         ) {
             showAlert(

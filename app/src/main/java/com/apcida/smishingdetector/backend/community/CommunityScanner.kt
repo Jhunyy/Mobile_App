@@ -30,7 +30,8 @@ data class CommunityScanProgress(
 data class CommunityScanResult(
     val candidates: List<ContributionCandidate>,
     val progress: CommunityScanProgress,
-    val stopReason: StopReason
+    val stopReason: StopReason,
+    val nextOffset: Int = 0
 ) {
     enum class StopReason { FINISHED, TIME_LIMIT, MESSAGE_LIMIT, ANALYSIS_LIMIT, MODEL_FAILURE }
 }
@@ -56,7 +57,6 @@ class CommunityScanner(private val context: Context) {
         onProgress: suspend (CommunityScanProgress) -> Unit = {}
     ): CommunityScanResult =
         withContext(Dispatchers.IO) {
-            val deadline = SystemClock.elapsedRealtime() + MAX_SCAN_MILLIS
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
                 throw SecurityException("SMS access is required to scan existing messages.")
             }
@@ -67,6 +67,7 @@ class CommunityScanner(private val context: Context) {
             val thresholds = ThresholdEvaluator()
             val validator = GemmaManager.getReadyValidator(context)
             if (!validator.isReady()) throw IllegalStateException("On-device Gemma model is unavailable.")
+            val deadline = SystemClock.elapsedRealtime() + MAX_SCAN_MILLIS
             val found = mutableListOf<ContributionCandidate>()
             val seenIds = excludedIds.toMutableSet()
             val seenTemplates = mutableSetOf<String>()
@@ -85,6 +86,7 @@ class CommunityScanner(private val context: Context) {
             ) ?: return@withContext CommunityScanResult(
                 emptyList(), CommunityScanProgress(0, 0, 0), stopReason
             )
+            var nextOffset = 0
             cursor.use {
                 val startOffset = scanPrefs.getInt(NEXT_OFFSET, 0).coerceAtLeast(0)
                 if (!it.moveToPosition(startOffset - 1)) it.moveToPosition(-1)
@@ -115,6 +117,7 @@ class CommunityScanner(private val context: Context) {
                     val remainingTime = deadline - SystemClock.elapsedRealtime()
                     if (remainingTime <= 0) {
                         stopReason = CommunityScanResult.StopReason.TIME_LIMIT
+                        examined--
                         break
                     }
                     reportProgress(analyzing = true)
@@ -123,6 +126,11 @@ class CommunityScanner(private val context: Context) {
                     }
                     analyzed++
                     reportProgress()
+                    if (gemma == null && SystemClock.elapsedRealtime() >= deadline) {
+                        stopReason = CommunityScanResult.StopReason.TIME_LIMIT
+                        examined--
+                        break
+                    }
                     if (gemma?.isSuccessful != true) {
                         consecutiveFailures++
                         if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
@@ -144,10 +152,11 @@ class CommunityScanner(private val context: Context) {
                     if (category == "SCAM") scamCount++ else safeCount++
                     reportProgress()
                 }
-                val nextOffset = if (stopReason == CommunityScanResult.StopReason.FINISHED ||
+                nextOffset = if (stopReason == CommunityScanResult.StopReason.FINISHED ||
                     stopReason == CommunityScanResult.StopReason.MODEL_FAILURE) 0 else startOffset + examined
                 scanPrefs.edit().putInt(NEXT_OFFSET, nextOffset).apply()
             }
-            CommunityScanResult(found, CommunityScanProgress(examined, analyzed, found.size), stopReason)
+            CommunityScanResult(found, CommunityScanProgress(examined, analyzed, found.size),
+                stopReason, nextOffset)
         }
 }
