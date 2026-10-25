@@ -31,7 +31,6 @@ import com.apcida.smishingdetector.backend.community.CommunityScanResult
 import com.apcida.smishingdetector.backend.community.ContributionCandidate
 import com.apcida.smishingdetector.backend.community.ContributionItem
 import com.apcida.smishingdetector.backend.community.ContributionProgress
-import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,7 +79,7 @@ class CommunityFragment : Fragment() {
         val intro = panel()
         intro.addView(label("Your choice", 18f, true, R.color.inbox_text))
         intro.addView(label(
-            "You may contribute up to 20 scam and 20 safe SMS messages (40 total). ApCiDa will examine accessible messages stored on this device, including messages received before installation. Scanning and Gemma analysis happen on your device. Nothing is shared during the scan. You will review, edit, remove, and confirm each proposed message before upload. Participation is optional.",
+            "You may contribute up to 20 scam and 20 safe SMS messages (40 total). ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation if they are still within that period. Scanning and Gemma analysis happen on your device. Nothing is shared during the scan. You will review, edit, remove, and confirm each proposed message before upload. Participation is optional.",
             14f, false, R.color.inbox_muted), margin(0, 8))
         intro.addView(label("A contribution may share your edited SMS text, the model's predicted category, your reviewed category, a pseudonymous participant ID, and submission time. Sender numbers and contact names are never included. Researchers must verify labels independently.",
             13f, false, R.color.inbox_muted), margin(0, 10))
@@ -148,7 +147,7 @@ class CommunityFragment : Fragment() {
         }
         AlertDialog.Builder(requireContext())
             .setTitle("Start local SMS scan?")
-            .setMessage("ApCiDa will examine accessible stored SMS on this device, including older messages, to find possible research contributions. It will also check for messages missing from your Messages tab. This scan sends no SMS to the server. You will separately review and confirm any upload.")
+            .setMessage("ApCiDa will examine accessible SMS received in the last 30 days on this device to find possible research contributions. This scan sends no SMS to the server. You will separately review and confirm any upload.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Start Contributing") { _, _ ->
                 if (com.apcida.smishingdetector.util.PermissionHelper.hasReadSmsPermission(requireContext())) startScan()
@@ -161,7 +160,7 @@ class CommunityFragment : Fragment() {
         scanning = true
         startButton.isEnabled = false
         busy.visibility = View.VISIBLE
-        status.text = "Preparing messages on this device…"
+        status.text = "Preparing SMS from the last 30 days…"
         candidateContainer.removeAllViews()
         rows.clear()
         submitButton.visibility = View.GONE
@@ -189,9 +188,9 @@ class CommunityFragment : Fragment() {
                 ) { scanProgress ->
                     withContext(Dispatchers.Main) {
                         status.text = if (scanProgress.analyzing) {
-                            "Analyzing stored SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
+                            "Analyzing recent SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
                         } else {
-                            "Checked ${scanProgress.examined} stored SMS; analyzed ${scanProgress.analyzed}; found ${scanProgress.candidates} for review…"
+                            "Checked ${scanProgress.examined} SMS from the last 30 days; analyzed ${scanProgress.analyzed}; found ${scanProgress.candidates} for review…"
                         }
                     }
                 }
@@ -202,7 +201,6 @@ class CommunityFragment : Fragment() {
             } catch (error: Exception) {
                 status.text = error.message ?: "The local scan could not be completed."
             } finally {
-                context?.applicationContext?.let(SmsInboxSyncWorker::enqueue)
                 scanning = false
                 startButton.isEnabled = true
                 busy.visibility = View.GONE
@@ -211,21 +209,21 @@ class CommunityFragment : Fragment() {
     }
 
     private fun scanResultMessage(result: CommunityScanResult): String {
-        val summary = "Checked ${result.progress.examined} stored SMS and analyzed ${result.progress.analyzed}. "
+        val summary = "Checked ${result.progress.examined} SMS from the last 30 days and analyzed ${result.progress.analyzed}. "
         val outcome = if (result.candidates.isEmpty()) "No messages qualified in this scan." else
             "Found ${result.candidates.size} for review. Edit or remove any message before sharing."
         val limit = when (result.stopReason) {
             CommunityScanResult.StopReason.FINISHED -> ""
-            CommunityScanResult.StopReason.TIME_LIMIT -> " Scan stopped after three minutes. Start another scan to check older messages."
-            CommunityScanResult.StopReason.MESSAGE_LIMIT -> " Scan stopped after checking 1,000 messages. Start another scan to check older messages."
-            CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after analyzing 20 messages. Start another scan to check older messages."
+            CommunityScanResult.StopReason.TIME_LIMIT -> " Scan stopped after three minutes."
+            CommunityScanResult.StopReason.MESSAGE_LIMIT -> " Scan stopped after checking 1,000 messages."
+            CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after analyzing 20 messages."
             CommunityScanResult.StopReason.MODEL_FAILURE ->
                 " On-device analysis failed three times in a row. Check that the Gemma model works on this phone."
         }
-        val resume = if (result.nextOffset > 0) {
-            " Next scan continues after the first ${result.nextOffset} stored SMS."
+        val resume = if (result.willResume) {
+            " Start another scan to continue with older SMS from the last 30 days."
         } else ""
-        return summary + outcome + limit + resume + " Checking for missed Messages in the background."
+        return summary + outcome + limit + resume
     }
 
     private fun renderCandidates(candidates: List<ContributionCandidate>) {

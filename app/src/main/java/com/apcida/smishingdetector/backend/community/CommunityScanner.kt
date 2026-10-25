@@ -31,22 +31,27 @@ data class CommunityScanResult(
     val candidates: List<ContributionCandidate>,
     val progress: CommunityScanProgress,
     val stopReason: StopReason,
-    val nextOffset: Int = 0
+    val willResume: Boolean = false
 ) {
     enum class StopReason { FINISHED, TIME_LIMIT, MESSAGE_LIMIT, ANALYSIS_LIMIT, MODEL_FAILURE }
 }
 
-/** Reads only SMS bodies on device; no sender addresses are queried or stored. */
+/** Reads recent SMS bodies on device; no sender addresses are queried or stored. */
 class CommunityScanner(private val context: Context) {
     companion object {
         private const val SCAN_PREFS = "community_scan"
-        private const val NEXT_OFFSET = "next_sms_offset"
+        private const val LAST_SMS_DATE = "last_sms_date"
+        private const val LAST_SMS_ID = "last_sms_id"
+        private const val LEGACY_NEXT_OFFSET = "next_sms_offset"
+        private const val SCAN_WINDOW_MILLIS = 30L * 24 * 60 * 60 * 1000
         private const val MAX_SCAN_MILLIS = 180_000L
         private const val MAX_INFERENCE_MILLIS = 60_000L
         private const val MAX_EXAMINED = 1_000
         private const val MAX_ANALYZED = 20
         private const val MAX_CONSECUTIVE_FAILURES = 3
     }
+
+    private data class ScanMarker(val date: Long, val id: Long)
 
     private val scanPrefs = context.getSharedPreferences(SCAN_PREFS, Context.MODE_PRIVATE)
 
@@ -80,16 +85,38 @@ class CommunityScanner(private val context: Context) {
             suspend fun reportProgress(analyzing: Boolean = false) =
                 onProgress(CommunityScanProgress(examined, analyzed, found.size, analyzing))
             reportProgress()
+            val scanStartedAt = System.currentTimeMillis()
+            val cutoff = scanStartedAt - SCAN_WINDOW_MILLIS
+            val savedDate = scanPrefs.getLong(LAST_SMS_DATE, 0L)
+            val savedId = scanPrefs.getLong(LAST_SMS_ID, 0L)
+            val resumeMarker = if (savedId > 0 && savedDate in cutoff..scanStartedAt) {
+                ScanMarker(savedDate, savedId)
+            } else null
+            val selection = buildString {
+                append("${Telephony.Sms.DATE} >= ? AND ${Telephony.Sms.DATE} <= ?")
+                if (resumeMarker != null) {
+                    append(" AND (${Telephony.Sms.DATE} < ? OR ")
+                    append("(${Telephony.Sms.DATE} = ? AND ${Telephony.Sms._ID} < ?))")
+                }
+            }
+            val selectionArgs = mutableListOf(cutoff.toString(), scanStartedAt.toString()).apply {
+                if (resumeMarker != null) {
+                    add(resumeMarker.date.toString())
+                    add(resumeMarker.date.toString())
+                    add(resumeMarker.id.toString())
+                }
+            }.toTypedArray()
             val cursor = context.contentResolver.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
-                arrayOf(Telephony.Sms.BODY), null, null, "${Telephony.Sms.DATE} DESC"
+                arrayOf(Telephony.Sms._ID, Telephony.Sms.DATE, Telephony.Sms.BODY),
+                selection, selectionArgs, "${Telephony.Sms.DATE} DESC, ${Telephony.Sms._ID} DESC"
             ) ?: return@withContext CommunityScanResult(
                 emptyList(), CommunityScanProgress(0, 0, 0), stopReason
             )
-            var nextOffset = 0
+            var lastChecked = resumeMarker
             cursor.use {
-                val startOffset = scanPrefs.getInt(NEXT_OFFSET, 0).coerceAtLeast(0)
-                if (!it.moveToPosition(startOffset - 1)) it.moveToPosition(-1)
+                val idIndex = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
                 val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
                 while (scamCount < scamRemaining || safeCount < safeRemaining) {
                     coroutineContext.ensureActive()
@@ -106,6 +133,8 @@ class CommunityScanner(private val context: Context) {
                         break
                     }
                     if (!it.moveToNext()) break
+                    val previousMarker = lastChecked
+                    lastChecked = ScanMarker(it.getLong(dateIndex), it.getLong(idIndex))
                     examined++
                     if (examined % 25 == 0) reportProgress()
                     val body = it.getString(bodyIndex) ?: continue
@@ -117,6 +146,7 @@ class CommunityScanner(private val context: Context) {
                     val remainingTime = deadline - SystemClock.elapsedRealtime()
                     if (remainingTime <= 0) {
                         stopReason = CommunityScanResult.StopReason.TIME_LIMIT
+                        lastChecked = previousMarker
                         examined--
                         break
                     }
@@ -128,6 +158,7 @@ class CommunityScanner(private val context: Context) {
                     reportProgress()
                     if (gemma == null && SystemClock.elapsedRealtime() >= deadline) {
                         stopReason = CommunityScanResult.StopReason.TIME_LIMIT
+                        lastChecked = previousMarker
                         examined--
                         break
                     }
@@ -152,11 +183,21 @@ class CommunityScanner(private val context: Context) {
                     if (category == "SCAM") scamCount++ else safeCount++
                     reportProgress()
                 }
-                nextOffset = if (stopReason == CommunityScanResult.StopReason.FINISHED ||
-                    stopReason == CommunityScanResult.StopReason.MODEL_FAILURE) 0 else startOffset + examined
-                scanPrefs.edit().putInt(NEXT_OFFSET, nextOffset).apply()
             }
+            val markerToSave = lastChecked
+            val willResume = markerToSave != null &&
+                stopReason != CommunityScanResult.StopReason.FINISHED &&
+                stopReason != CommunityScanResult.StopReason.MODEL_FAILURE
+            scanPrefs.edit().remove(LEGACY_NEXT_OFFSET).apply {
+                if (willResume) {
+                    putLong(LAST_SMS_DATE, markerToSave.date)
+                    putLong(LAST_SMS_ID, markerToSave.id)
+                } else {
+                    remove(LAST_SMS_DATE)
+                    remove(LAST_SMS_ID)
+                }
+            }.apply()
             CommunityScanResult(found, CommunityScanProgress(examined, analyzed, found.size),
-                stopReason, nextOffset)
+                stopReason, willResume)
         }
 }
