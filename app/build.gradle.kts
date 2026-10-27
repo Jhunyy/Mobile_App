@@ -25,6 +25,8 @@ val communityApiKey = System.getenv("APCIDA_COMMUNITY_API_KEY")
     ?: ""
 // A public DNS identity, never a credential. Configured only for local debug pilot builds.
 val pilotApprovedHost = localProperties.getProperty("apcida.pilotApprovedHost") ?: ""
+// Empty until a separately approved stable HTTPS identity is provisioned. This is not a secret.
+val productionApprovedHost = localProperties.getProperty("apcida.productionApprovedHost") ?: ""
 
 android {
     namespace = "com.apcida.smishingdetector"
@@ -40,6 +42,7 @@ android {
         buildConfigField("String", "REPORT_BASE_URL", buildConfigString(reportBaseUrl))
         buildConfigField("String", "REPORT_API_KEY", buildConfigString(reportApiKey))
         buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(communityApiKey))
+        buildConfigField("String", "PRODUCTION_APPROVED_HOST", buildConfigString(productionApprovedHost))
     }
 
     buildTypes {

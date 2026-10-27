@@ -14,6 +14,7 @@ import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
+import com.apcida.smishingdetector.backend.worker.ProductionRevocationWorker
 import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import com.apcida.smishingdetector.databinding.ActivityMainBinding
@@ -43,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         seedDatabase()
         showConsentOnboardingIfNeeded()
         recoverOrphanedAiWork()
+        ProductionRevocationWorker.enqueueIfPending(applicationContext)
         ReportUploadWorker.enqueue(applicationContext)
         requestRequiredPermissions()
     }

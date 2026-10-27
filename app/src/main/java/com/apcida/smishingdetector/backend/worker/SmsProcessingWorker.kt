@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.backend.network.ProductionTiming
 import com.apcida.smishingdetector.controller.SmsController
 import com.apcida.smishingdetector.model.data.ProcessingState
 
@@ -20,7 +21,7 @@ class SmsProcessingWorker(appContext: Context, params: WorkerParameters) : Corou
         private const val PREFIX = "sms_ai_message_"
         suspend fun recoverOrphaned(context: Context) {
             val ids = AppDatabase.getInstance(context).messageDao()
-                .getStaleAiMessageIds(System.currentTimeMillis() - 120_000)
+                .getStaleAiMessageIds(System.currentTimeMillis() - ProductionTiming.ORPHAN_STALE_MS)
             ids.forEach { SmsController(context).markAiUnavailable(it) }
         }
         fun enqueue(context: Context, messageId: Long) {

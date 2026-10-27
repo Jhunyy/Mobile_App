@@ -24,11 +24,14 @@ class SyntheticNotificationInstrumentedTest {
     @Test fun localWarningIsUpdatedOnceAndSurvivesUnavailableAnalysis() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val manager = context.getSystemService(NotificationManager::class.java)
-        assumeTrue(NotificationManagerCompat.from(context).areNotificationsEnabled())
-        assumeTrue(Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+        assumeTrue("Enable notifications for the ApCiDa debug app before this test",
+            NotificationManagerCompat.from(context).areNotificationsEnabled())
+        assumeTrue("Grant POST_NOTIFICATIONS to the ApCiDa debug app before this test",
+            Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
             context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
-        assumeTrue(context.getSharedPreferences(Constants.PREFS_NAME, 0)
-            .getBoolean(Constants.PREF_ALERTS_ENABLED, true))
+        assumeTrue("Enable scam alerts in ApCiDa Settings before this test",
+            context.getSharedPreferences(Constants.PREFS_NAME, 0)
+                .getBoolean(Constants.PREF_ALERTS_ENABLED, true))
 
         val id = 2_000_003_001L
         fun active() = manager.activeNotifications.filter { it.id == id.toInt() }

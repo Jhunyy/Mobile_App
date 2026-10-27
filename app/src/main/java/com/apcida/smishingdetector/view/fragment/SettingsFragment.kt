@@ -28,6 +28,7 @@ import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
+import com.apcida.smishingdetector.backend.worker.ProductionRevocationWorker
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment() {
     private lateinit var aiSwitch: SwitchCompat
+    private lateinit var deletionStatus: TextView
     private lateinit var smsSwitch: SwitchCompat
     private lateinit var notificationSwitch: SwitchCompat
     private lateinit var namesSwitch: SwitchCompat
@@ -114,6 +116,14 @@ class SettingsFragment : Fragment() {
         protection.addView(label("Current service status: remote automatic analysis unavailable; keyword-only protection active.", 13f, false, R.color.inbox_muted).apply {
             setPadding(dp(12), dp(4), dp(12), dp(12))
         })
+        deletionStatus = label("", 13f, false, R.color.inbox_muted).apply {
+            setPadding(dp(12), dp(4), dp(12), dp(12))
+            setOnClickListener {
+                ProductionRevocationWorker.enqueueIfPending(requireContext(), replace = true)
+                refreshSwitches()
+            }
+        }
+        protection.addView(deletionStatus)
 
         section(body, "Permissions", 26)
         val permissions = card(body)
@@ -171,7 +181,28 @@ class SettingsFragment : Fragment() {
 
     private fun refreshSwitches() {
         val context = requireContext()
-        aiSwitch.isChecked = AiProtectionConsentStore(context).snapshot().enabled
+        val protectionStore = AiProtectionConsentStore(context)
+        aiSwitch.isChecked = protectionStore.snapshot().enabled
+        if (::deletionStatus.isInitialized) {
+            val status = protectionStore.remoteDeletionStatus()
+            deletionStatus.text = when (status) {
+                AiProtectionConsentStore.RemoteDeletionStatus.NOT_REQUIRED -> "No remote deletion pending."
+                AiProtectionConsentStore.RemoteDeletionStatus.PENDING ->
+                    "Remote cache deletion pending. Tap to retry."
+                AiProtectionConsentStore.RemoteDeletionStatus.CONFIGURATION_REQUIRED ->
+                    "Remote deletion pending: approved server not configured. Tap after setup to retry."
+                AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED ->
+                    "Remote deletion pending: server unavailable. Tap to retry."
+                AiProtectionConsentStore.RemoteDeletionStatus.CREDENTIAL_UNAVAILABLE ->
+                    "Remote deletion unconfirmed: credential unavailable. Contact the pilot administrator."
+                AiProtectionConsentStore.RemoteDeletionStatus.AUTH_REJECTED ->
+                    "Remote deletion unconfirmed: authentication rejected. Contact the pilot administrator; tap after correction to retry."
+                AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED ->
+                    "Remote installation revoked and cached responses deleted."
+            }
+            deletionStatus.isClickable = protectionStore.remoteDeletionPending() &&
+                status != AiProtectionConsentStore.RemoteDeletionStatus.CREDENTIAL_UNAVAILABLE
+        }
         smsSwitch.isChecked = PermissionHelper.hasSmsPermissions(context)
         notificationSwitch.isChecked = preferences().getBoolean(Constants.PREF_ALERTS_ENABLED, true) &&
             PermissionHelper.hasNotificationPermission(context) &&
