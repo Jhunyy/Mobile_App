@@ -13,7 +13,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -123,14 +122,14 @@ class ReportUploadManager(private val context: Context) {
                 Log.w(
                     TAG,
                     "Report ${report.reportId} upload failed. " +
-                            "Server returned: ${response.code()} ${response.message()}"
+                            "Server returned HTTP ${response.code()}"
                 )
             }
 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Error uploading report ${report.reportId}: ${e.message}")
+            Log.e(TAG, "Report ${report.reportId} upload failed; will retry.")
             // Report stays as is_sent = false for retry on next attempt
         }
     }
@@ -163,12 +162,7 @@ class ReportUploadManager(private val context: Context) {
      * logging and timeout configuration.
      */
     private fun createApiService(): ReportApiService {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-
         val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)

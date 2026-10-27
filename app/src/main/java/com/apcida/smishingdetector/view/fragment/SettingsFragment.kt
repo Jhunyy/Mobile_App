@@ -28,8 +28,13 @@ import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
+import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment() {
+    private lateinit var aiSwitch: SwitchCompat
     private lateinit var smsSwitch: SwitchCompat
     private lateinit var notificationSwitch: SwitchCompat
     private lateinit var namesSwitch: SwitchCompat
@@ -79,6 +84,35 @@ class SettingsFragment : Fragment() {
         body.addView(heading)
         body.addView(label("Manage your protection and preferences", 15f, false, R.color.inbox_muted).apply {
             setPadding(dp(54), 0, 0, 0)
+        })
+
+        section(body, "AI Protection", 26)
+        val protection = card(body)
+        aiSwitch = switchRow(protection, R.drawable.ic_safety, "AI Protection",
+            "Consent to remote analysis of each new SMS. Secure service setup is pending; local keyword warnings remain active.") { enabled ->
+            val store = AiProtectionConsentStore(requireContext())
+            if (!enabled) {
+                store.revoke()
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    store.reconcileRevokedPending()
+                }
+                refreshSwitches()
+            } else if (!PermissionHelper.hasSmsPermissions(requireContext())) {
+                AlertDialog.Builder(requireContext())
+                    .setMessage("Grant SMS permission before enabling AI Protection.")
+                    .setPositiveButton("OK", null).show()
+                refreshSwitches()
+            } else {
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Enable AI Protection?")
+                    .setMessage("ApCiDa will automatically send each newly received SMS text, sender, receipt time and request ID to its remote Gemma 3 12B + RAG service. Local keyword warnings continue if the service is unavailable. You can revoke this in Settings; requests already sent cannot be recalled. Research contribution is separate. Automatic sending stays disabled until secure HTTPS and per-install authentication are ready.")
+                    .setNegativeButton("Cancel") { _, _ -> refreshSwitches() }
+                    .setPositiveButton("I agree") { _, _ -> store.grant(); refreshSwitches() }
+                    .show()
+            }
+        }
+        protection.addView(label("Current service status: remote automatic analysis unavailable; keyword-only protection active.", 13f, false, R.color.inbox_muted).apply {
+            setPadding(dp(12), dp(4), dp(12), dp(12))
         })
 
         section(body, "Permissions", 26)
@@ -137,6 +171,7 @@ class SettingsFragment : Fragment() {
 
     private fun refreshSwitches() {
         val context = requireContext()
+        aiSwitch.isChecked = AiProtectionConsentStore(context).snapshot().enabled
         smsSwitch.isChecked = PermissionHelper.hasSmsPermissions(context)
         notificationSwitch.isChecked = preferences().getBoolean(Constants.PREF_ALERTS_ENABLED, true) &&
             PermissionHelper.hasNotificationPermission(context) &&

@@ -279,7 +279,7 @@ class MessagesFragment : Fragment() {
                 when (selectedFilter) {
                     InboxFilter.ALL -> true
                     InboxFilter.SCAM -> message.riskLevel == Constants.RISK_SCAM
-                    InboxFilter.SAFE -> message.riskLevel == Constants.RISK_SAFE
+                    InboxFilter.SAFE -> message.finalClassification == Constants.RISK_SAFE
                     InboxFilter.UNREAD -> message.messageId.toString() !in readMessageIds
                 }
             }

@@ -39,4 +39,12 @@ class CommunityPolicyTest {
         assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, highScam,
             RiskLevel.SCAM, 0, 1))
     }
+
+    @Test fun modelOpinionWithoutFinalScamVerdictIsNotACommunityScamCandidate() {
+        val modelOpinion = GemmaResult("SCAM", "HIGH", "Uncorroborated suspicion")
+        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, modelOpinion,
+            RiskLevel.SUSPICIOUS, 1, 1))
+        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, modelOpinion,
+            RiskLevel.SAFE, 1, 1))
+    }
 }

@@ -1,5 +1,7 @@
 # Updated Always-On SMS Detection Architecture
 
+> **Current implementation record.** Phase 3D changes the target product architecture to consent-based, automatic remote Gemma 3 12B + RAG as core protection. See [PHASE3D_CORE_AI_ARCHITECTURE.md](PHASE3D_CORE_AI_ARCHITECTURE.md) for the file-by-file implementation plan. The on-device Gemma flow below remains a description of existing code until that plan is implemented.
+
 ## Previous flow and limitations
 
 The original receiver launched an unmanaged coroutine and ran keyword scoring before conditionally invoking Gemma. Android could finish the broadcast and kill the process before that coroutine completed. The risk threshold therefore acted as an AI gate: a scam that avoided seeded phrases could also avoid contextual analysis. Gemma output overwrote the rule result, content-only hashes suppressed legitimate repeated messages indefinitely, and model lifetime was tied to `MainActivity`.

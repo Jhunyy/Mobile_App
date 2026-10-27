@@ -25,18 +25,20 @@ class KeywordEngine(private val keywordDao: KeywordDao) {
         Log.d(TAG, "Loaded ${allKeywords.size} active keywords from database.")
         val urls = UrlCandidates.extract(messageBody)
 
-        // Find all keywords that appear in the message
-        val matched = mutableListOf<Keyword>()
-
-        for (keyword in allKeywords) {
-            val matches = if (keyword.patternType == "URL_PATTERN") {
-                urls.any { UrlCandidates.matchesHost(it.host, keyword.pattern) }
-            } else {
+        val matched = allKeywords.filterTo(mutableListOf()) { keyword ->
+            keyword.patternType != "URL_PATTERN" && RuleWeightPolicy.weight(keyword) > 0f &&
                 KeywordPatternMatcher.matches(messageBody, keyword.pattern, keyword.patternType)
-            }
-            if (matches) {
-                matched.add(keyword)
-            }
+        }
+
+        // A host can match both a specific spoof label and a generic suffix.
+        // Count only the strongest seeded URL clue for that host.
+        val urlPatterns = allKeywords.filter { it.patternType == "URL_PATTERN" &&
+            RuleWeightPolicy.weight(it) > 0f }
+        urls.forEach { url ->
+            val strongest = urlPatterns.filter { UrlCandidates.matchesHost(url.host, it.pattern) }
+                .maxByOrNull { RuleWeightPolicy.weight(it) }
+            if (strongest != null && matched.none { it.pattern == strongest.pattern &&
+                it.patternType == strongest.patternType }) matched.add(strongest)
         }
 
         matched.addAll(UrlIndicatorDetector.detect(urls, matched))

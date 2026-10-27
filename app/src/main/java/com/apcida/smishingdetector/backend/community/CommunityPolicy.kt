@@ -5,7 +5,7 @@ import com.apcida.smishingdetector.model.data.RiskLevel
 import com.apcida.smishingdetector.util.Constants
 import java.security.MessageDigest
 
-/** Local candidate filtering. The participant still reviews every proposed text. */
+/** Local candidate filtering for collection, not a source of accuracy ground truth. */
 object CommunityPolicy {
     const val CATEGORY_LIMIT = 20
     const val TOTAL_LIMIT = 40

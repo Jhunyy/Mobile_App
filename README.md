@@ -1,17 +1,21 @@
 # KA-SDS: Keyword-Augmented Smishing Detection System
 
+> **Current Phase 3E status (October 2026):** Incoming SMS now receives offline keyword-rule screening. On-device Gemma is no longer called by the production SMS path. Remote Gemma 3 12B + RAG is the target primary classifier, but automatic real-SMS transmission is **disabled** until production HTTPS, per-install authentication, and server identity validation are complete. A zero-rule message is shown as **UNVERIFIED**, not SAFE. Consent is opt-in and revocable. See [PHASE3E_CORE_AI_IMPLEMENTATION.md](PHASE3E_CORE_AI_IMPLEMENTATION.md) for current behavior and build commands. The detector description below documents the earlier on-device prototype and is retained for historical evaluation context.
+
 Android application for detecting SMS phishing ("smishing") messages using a two-stage pipeline: on-device keyword/pattern analysis, followed by contextual validation from an on-device LLM (Gemma). Built as an undergraduate thesis project.
+
+For labeled, on-device detector measurement, see [BATCH_EVALUATION.md](BATCH_EVALUATION.md). The CSV evaluation screen is available only in the isolated debug APK.
 
 ## How Detection Works
 
 **Stage 1 — Keyword Analysis**
-Incoming SMS text is checked against a seeded keyword/URL-pattern database. Matches are weighted and summed into a preliminary risk score. The score is not reduced for saved contacts. When contact names are enabled, contact membership is stored for the final verdict; it does not verify sender identity.
+Incoming SMS text is checked against a seeded keyword/URL-pattern database. Phrase matches use letter/digit boundaries, and URL rules inspect extracted hosts. Broad brand and service terms have no standalone risk weight; ordinary links, shorteners, and top-level domains receive limited weight. Overlapping phrases count once, as does the strongest URL pattern for each host. Runtime weight caps also apply to older installations whose database retains the original seed. The rule score is not reduced for saved contacts; contact membership does not verify sender identity.
 
 **Stage 2 — On-Device LLM Validation**
 Every non-duplicate incoming message is queued for Gemma (running fully on-device via MediaPipe's LLM Inference API) along with the matched keywords and up to three earlier incoming SMS from the same sender within 48 hours. Short messages are still analyzed. The prompt asks Gemma to classify only the latest SMS.
 
 **Combined risk points**
-The app also records a separate 0–100 point breakdown: up to 25 from current message rules, 60 from a HIGH/MEDIUM-confidence Gemma SCAM result (30 for LOW), up to 25 from a Gemma-confirmed sender scam in the previous 24 hours (10 for an earlier LOW-confidence SCAM), and up to 5 for a concrete institution/sender mismatch. A score of 25 or more keeps an otherwise SAFE message SUSPICIOUS. The point total is not a probability and does not independently turn a message into SCAM. Saved-contact membership never subtracts points. A simple greeting with no independent risk signal does not receive Gemma scam points.
+The app also records a separate 0–100 point breakdown: up to 25 from current message rules, 60 from a HIGH/MEDIUM-confidence Gemma SCAM result (30 for LOW), up to 25 from a prior scam warning for the same sender, and up to 5 for a concrete institution/sender mismatch. A score of 25 or more keeps an otherwise SAFE message SUSPICIOUS. The point total is not a probability and does not independently turn a message into SCAM. Short neutral conversation without a link, request, or fraud cue receives no Gemma scam points.
 
 When a prior message classified as a scam from the same sender is still within the 24-hour warning window, the prompt asks Gemma to explain the latest SMS in light of that sender history. The message detail screen explains the final verdict first. It shows sender history when relevant and puts the raw AI result, rationale, and self-reported confidence under “Show analysis details.”
 
@@ -27,7 +31,7 @@ Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
         Stage 2: GemmaValidator (PromptBuilder → on-device inference → GemmaOutputParser)
             │
             ▼
-        FinalVerdictResolver (rule risk + Gemma result + contact and rule-signal evidence)
+        FinalVerdictResolver (rule risk + Gemma result + rule-signal evidence)
             │
             ▼
         CombinedRiskScorer (0–100 points; SUSPICIOUS minimum at 25)
@@ -36,11 +40,11 @@ Stage 1: KeywordEngine → RiskScorer → ThresholdEvaluator
         DetectionResult (SAFE / SUSPICIOUS / SCAM + rationale)
 ```
 
-Repeated message text is analyzed when received again outside the short duplicate-broadcast window. Gemma loads on demand and inference is serialized for overlapping messages. If the model is unavailable or inference fails, rule-SCAM remains SCAM, rule-SUSPICIOUS remains SUSPICIOUS, and rule-SAFE is marked SUSPICIOUS for review, except that a simple greeting without risk signals stays SAFE unless a confirmed scam from the same sender falls within the previous 24 hours. The Gemma result records that analysis was unavailable.
+Repeated message text is analyzed when received again outside the short duplicate-broadcast window. Gemma loads on demand and inference is serialized for overlapping messages. If inference fails, the rule verdict remains in effect and the AI status records that analysis was unavailable. A rule-SAFE message is not made suspicious merely because the model failed. A recent scam warning for the same sender can still raise the final verdict to SUSPICIOUS.
 
-Keywords match complete phrases, and URL patterns are matched against extracted hosts. A saved contact can clear a rule-SUSPICIOUS result only when Gemma reports LEGITIMATE with HIGH confidence, no strong rule signal was found, and the combined score does not require a SUSPICIOUS warning. A rule-SCAM result stays flagged when it conflicts with a benign Gemma assessment. Gemma can still identify a scam when no keyword matches, except that a simple greeting with no link, request, or matched risk signal stays SAFE despite an AI scam suggestion. A confirmed scam from the same sender within 24 hours makes that greeting SUSPICIOUS. Model-reported confidence is displayed but is not treated as a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
+Gemma's SCAM answer without independent strong rule evidence produces a SUSPICIOUS warning, while a strong credential/payment request or a high-risk URL can support a definitive SCAM verdict. A HIGH-confidence LEGITIMATE result can clear a weak rule-SUSPICIOUS warning, but strong rule evidence remains flagged. Brief neutral messages without a link, request, or fraud cue can stay SAFE despite an unsupported Gemma SCAM answer. The app logs rule, Gemma, confidence, final verdict, and AI status without logging SMS text. Model-reported confidence is displayed but is not a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
 
-All SMS processing happens on-device. No raw SMS content is ever transmitted off the device — only anonymized metadata is sent when a user submits a report.
+SMS classification runs on-device. Optional reports and community contributions can share SMS text after the participant reviews the disclosure; community text is redacted before upload.
 
 ## Architecture
 

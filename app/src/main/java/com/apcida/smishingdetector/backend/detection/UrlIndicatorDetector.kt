@@ -21,16 +21,17 @@ object UrlIndicatorDetector {
                     return@mapNotNull null
                 }
 
-                val suspicious = host.startsWith("xn--") ||
-                    ipAddress.matches(host) ||
-                    host.count { it == '-' } >= 2 ||
-                    url.hasUserInfo
+                val weight = when {
+                    host.startsWith("xn--") || ipAddress.matches(host) || url.hasUserInfo -> 30f
+                    host.count { it == '-' } >= 2 -> 15f
+                    else -> 5f
+                }
 
                 Keyword(
                     keywordId = 0,
                     pattern = "URL:$host",
                     patternType = "URL_PATTERN",
-                    weight = if (suspicious) 40f else 10f,
+                    weight = weight,
                     language = "UNIVERSAL"
                 )
             }

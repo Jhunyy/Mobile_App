@@ -91,7 +91,22 @@ data class Message(
     val processingState: String = "PENDING",
 
     @ColumnInfo(name = "final_classification", defaultValue = "'SAFE'")
-    val finalClassification: String = "SAFE",
+    val finalClassification: String = "UNVERIFIED",
+
+    @ColumnInfo(name = "detection_state", defaultValue = "'LEGACY_ON_DEVICE'")
+    val detectionState: String = "LOCAL_PROVISIONAL",
+
+    @ColumnInfo(name = "verdict_source", defaultValue = "'LEGACY_ON_DEVICE'")
+    val verdictSource: String = "LOCAL_RULES",
+
+    @ColumnInfo(name = "remote_request_id")
+    val remoteRequestId: String? = null,
+
+    @ColumnInfo(name = "consent_generation", defaultValue = "0")
+    val consentGeneration: Long = 0,
+
+    @ColumnInfo(name = "notification_posted", defaultValue = "0")
+    val notificationPosted: Boolean = false,
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis()

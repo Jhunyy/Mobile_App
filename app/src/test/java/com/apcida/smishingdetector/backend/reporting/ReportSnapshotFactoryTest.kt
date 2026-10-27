@@ -47,6 +47,17 @@ class ReportSnapshotFactoryTest {
     }
 
     @Test
+    fun labelsRemoteAndRulesOnlySources() {
+        val remote = ReportSnapshotFactory.create(message.copy(verdictSource = "REMOTE_GEMMA_RAG"),
+            "Other", null, false, "1.2")
+        val local = ReportSnapshotFactory.create(message.copy(gemmaInvoked = false,
+            gemmaClassification = null, gemmaConfidence = null, gemmaRationale = null),
+            "Other", null, false, "1.2")
+        assertEquals("gemma3:12b+RAG", remote.modelVersionSnapshot)
+        assertEquals("keyword-rules-v2", local.modelVersionSnapshot)
+    }
+
+    @Test
     fun includesExactSmsOnlyWhenSelected() {
         val report = ReportSnapshotFactory.create(
             message, "Scam was not detected", null,

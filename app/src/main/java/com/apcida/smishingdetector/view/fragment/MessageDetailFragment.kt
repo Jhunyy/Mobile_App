@@ -222,16 +222,19 @@ class MessageDetailFragment : Fragment() {
             textRiskStatus.text = when {
                 analysisPending && message.processingState == ProcessingState.PENDING.name ->
                     "ANALYZING"
-                message.finalClassification == Constants.RISK_SCAM -> "SCAM"
-                message.finalClassification == Constants.RISK_SUSPICIOUS -> "SUSPICIOUS"
-                else -> "SAFE"
+                message.finalClassification == Constants.RISK_SCAM ->
+                    if (message.verdictSource == "LOCAL_RULES") "SCAM · RULES ONLY" else "SCAM"
+                message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                    if (message.verdictSource == "LOCAL_RULES") "SUSPICIOUS · RULES ONLY" else "SUSPICIOUS"
+                message.finalClassification == Constants.RISK_SAFE -> "SAFE"
+                else -> "UNVERIFIED"
             }
 
             if (message.combinedRiskScore == null) {
                 textRiskScore.text = "Rule risk score: ${message.riskScore.toInt()}"
                 textRiskBreakdown.visibility = View.GONE
             } else {
-                textRiskScore.text = "Combined risk points: ${message.combinedRiskScore}/100"
+                textRiskScore.text = "Local rule score: ${message.riskScore.toInt()}"
                 val reasons = buildList {
                     if (message.ruleRiskPoints > 0) add("Message signals +${message.ruleRiskPoints}")
                     if (message.aiRiskPoints > 0) add("Gemma +${message.aiRiskPoints}")
@@ -255,6 +258,8 @@ class MessageDetailFragment : Fragment() {
                     Color.parseColor("#CA433C") to Color.parseColor("#FDECEC")
                 message.finalClassification == Constants.RISK_SUSPICIOUS ->
                     Color.parseColor("#A86508") to Color.parseColor("#FFF1D8")
+                message.finalClassification == "UNVERIFIED" ->
+                    Color.parseColor("#346783") to Color.parseColor("#E8F0F6")
                 else ->
                     Color.parseColor("#218957") to Color.parseColor("#E5F4E9")
             }
@@ -273,10 +278,20 @@ class MessageDetailFragment : Fragment() {
             textRecentSenderHistory.visibility =
                 if (message.historyRiskPoints == 25 && !simpleGreeting) View.VISIBLE else View.GONE
 
-            if (analysisPending) {
+            if (message.verdictSource == "LOCAL_RULES") {
                 btnRetryAi.visibility = View.GONE
                 cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = "Analyzing this message on your device…"
+                btnToggleAnalysisDetails.visibility = View.GONE
+                layoutAnalysisDetails.visibility = View.GONE
+                textGemmaRationale.text = when (message.detectionState) {
+                    "REMOTE_UNAVAILABLE" -> "Remote Gemma 3 12B + RAG analysis is unavailable. This is a keyword-only result, not AI verified."
+                    "REMOTE_PENDING" -> "Remote AI analysis is pending. Local keyword warnings are preliminary."
+                    else -> "AI Protection is off. Local keywords are the only current check; no final SAFE verdict is available."
+                }
+            } else if (analysisPending) {
+                btnRetryAi.visibility = View.GONE
+                cardGemmaAnalysis.visibility = View.VISIBLE
+                textGemmaRationale.text = "Remote AI analysis is pending…"
                 btnToggleAnalysisDetails.visibility = View.GONE
                 layoutAnalysisDetails.visibility = View.GONE
             } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
@@ -304,6 +319,15 @@ class MessageDetailFragment : Fragment() {
                 }
                 btnToggleAnalysisDetails.visibility = View.GONE
                 layoutAnalysisDetails.visibility = View.GONE
+            } else if (message.verdictSource == "REMOTE_GEMMA_RAG") {
+                btnRetryAi.visibility = View.GONE
+                cardGemmaAnalysis.visibility = View.VISIBLE
+                btnToggleAnalysisDetails.visibility = View.GONE
+                layoutAnalysisDetails.visibility = View.GONE
+                textGemmaRationale.text = "Remote Gemma 3 12B + RAG: ${message.gemmaRationale ?: "No rationale returned."}"
+                textGemmaClassification.text = "Remote AI result: ${message.gemmaClassification ?: "Unavailable"}"
+                textGemmaConfidence.text = "Model confidence: ${message.gemmaConfidence ?: "N/A"} (self-reported)"
+                textGemmaRawReason.text = message.gemmaRationale ?: ""
             } else if (message.gemmaInvoked) {
                 btnRetryAi.visibility = View.GONE
 

@@ -23,6 +23,8 @@ val reportApiKey = System.getenv("APCIDA_REPORT_API_KEY")
 val communityApiKey = System.getenv("APCIDA_COMMUNITY_API_KEY")
     ?: localProperties.getProperty("apcida.communityApiKey")
     ?: ""
+// A public DNS identity, never a credential. Configured only for local debug pilot builds.
+val pilotApprovedHost = localProperties.getProperty("apcida.pilotApprovedHost") ?: ""
 
 android {
     namespace = "com.apcida.smishingdetector"
@@ -41,7 +43,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-eval"
+            buildConfigField("String", "PILOT_APPROVED_HOST", buildConfigString(pilotApprovedHost))
+        }
         release {
+            buildConfigField("String", "PILOT_APPROVED_HOST", buildConfigString(""))
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -92,7 +100,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     // MediaPipe LLM Inference
-    implementation(libs.mediapipe.tasks.genai)
+    debugImplementation(libs.mediapipe.tasks.genai)
 
     // Networking
     implementation(libs.retrofit)

@@ -1,20 +1,17 @@
 package com.apcida.smishingdetector.model.data
 
-/** Persisted lifecycle for an incoming SMS and its on-device AI analysis. */
 enum class ProcessingState {
-    PENDING,
-    RULE_ANALYZED,
-    AI_QUEUED,
-    AI_ANALYZING,
-    COMPLETED,
-    AI_FAILED;
+    PENDING, RULE_ANALYZED, AI_QUEUED, AI_ANALYZING, COMPLETED, AI_FAILED,
+    REMOTE_CONSENT_DISABLED, REMOTE_UNAVAILABLE;
 
     fun canTransitionTo(next: ProcessingState): Boolean = next in when (this) {
         PENDING -> setOf(RULE_ANALYZED)
-        RULE_ANALYZED -> setOf(AI_QUEUED)
-        AI_QUEUED -> setOf(AI_ANALYZING)
-        AI_ANALYZING -> setOf(COMPLETED, AI_FAILED)
-        AI_FAILED -> setOf(AI_QUEUED)
+        RULE_ANALYZED -> setOf(AI_QUEUED, REMOTE_CONSENT_DISABLED, REMOTE_UNAVAILABLE)
+        AI_QUEUED -> setOf(AI_ANALYZING, REMOTE_CONSENT_DISABLED, REMOTE_UNAVAILABLE)
+        AI_ANALYZING -> setOf(COMPLETED, AI_FAILED, REMOTE_CONSENT_DISABLED, REMOTE_UNAVAILABLE)
+        AI_FAILED -> setOf(AI_QUEUED, REMOTE_CONSENT_DISABLED)
+        REMOTE_UNAVAILABLE -> setOf(AI_QUEUED, REMOTE_CONSENT_DISABLED)
+        REMOTE_CONSENT_DISABLED -> setOf(AI_QUEUED)
         COMPLETED -> emptySet()
     }
 }

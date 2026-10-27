@@ -63,6 +63,7 @@ class GemmaValidator(private val context: Context) {
                     Log.d(TAG, "Prompt built. Running Gemma inference...")
 
                     var rawOutput = generateResponse(model, prompt)
+                    GemmaDiagnostics.logOutput("initial", rawOutput, GemmaOutputParser.parse(rawOutput))
                     Log.d(TAG, "Gemma inference completed")
                     if (!GemmaOutputParser.isValidFormat(rawOutput)) {
                         Log.w(TAG, "Gemma output format is invalid. Retrying with a format reminder.")
@@ -70,6 +71,7 @@ class GemmaValidator(private val context: Context) {
                             model,
                             "$prompt\n\nReturn exactly three lines. Classification must be SCAM or LEGITIMATE; Confidence must be HIGH, MEDIUM, or LOW."
                         )
+                        GemmaDiagnostics.logOutput("format_retry", rawOutput, GemmaOutputParser.parse(rawOutput))
                         if (!GemmaOutputParser.isValidFormat(rawOutput)) {
                             Log.w(TAG, "Gemma retry output format is invalid. Returning fallback.")
                             return@withLock GemmaResult.fallback()
@@ -82,7 +84,7 @@ class GemmaValidator(private val context: Context) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.e(TAG, "Gemma inference failed", e)
+                    Log.e(TAG, "Gemma inference failed: ${e.javaClass.simpleName}")
                     GemmaResult.fallback()
                 }
             }
@@ -103,7 +105,7 @@ class GemmaValidator(private val context: Context) {
                     try {
                         session.cancelGenerateResponseAsync()
                     } catch (error: Exception) {
-                        Log.w(TAG, "Unable to cancel Gemma generation", error)
+                        Log.w(TAG, "Unable to cancel Gemma generation: ${error.javaClass.simpleName}")
                     }
                 }
                 future.addListener({

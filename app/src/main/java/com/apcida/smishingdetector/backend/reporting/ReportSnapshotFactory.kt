@@ -31,9 +31,12 @@ object ReportSnapshotFactory {
         matchedIndicatorsSnapshot = message.matchedIndicators,
         smsTextSnapshot = message.content.takeIf { includeSmsText },
         appVersionSnapshot = appVersion,
-        modelVersionSnapshot = if (message.gemmaInvoked) {
-            Constants.GEMMA_MODEL_PATH.substringAfterLast('/')
-        } else null,
+        modelVersionSnapshot = when {
+            message.verdictSource == "REMOTE_GEMMA_RAG" -> "gemma3:12b+RAG"
+            message.gemmaInvoked -> Constants.GEMMA_MODEL_PATH.substringAfterLast('/') // legacy row
+            message.verdictSource == "LOCAL_RULES" -> "keyword-rules-v2"
+            else -> null
+        },
         reportedAt = reportedAt
     )
 }

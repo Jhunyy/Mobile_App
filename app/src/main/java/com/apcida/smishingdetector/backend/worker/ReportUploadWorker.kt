@@ -55,7 +55,7 @@ class ReportUploadWorker(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            Log.e(TAG, "Report upload attempt failed.", error)
+            Log.e(TAG, "Report upload attempt failed.")
             if (runAttemptCount < MAX_ATTEMPTS - 1) Result.retry() else Result.failure()
         }
     }

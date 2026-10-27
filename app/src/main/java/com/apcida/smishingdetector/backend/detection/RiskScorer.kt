@@ -29,22 +29,22 @@ class RiskScorer {
         }
 
         // Separate keyword matches from URL pattern matches
-        val keywordMatches = matchedKeywords.filter {
+        val keywordMatches = withoutOverlappingPhrases(matchedKeywords.filter {
             it.patternType == "KEYWORD"
-        }
+        })
         val urlMatches = matchedKeywords.filter {
             it.patternType == "URL_PATTERN"
         }
 
         // Sum keyword weights with cap
         val keywordScore = keywordMatches
-            .sumOf { it.weight.toDouble() }
+            .sumOf { RuleWeightPolicy.weight(it).toDouble() }
             .toFloat()
             .coerceAtMost(MAX_KEYWORD_CONTRIBUTION)
 
         // Sum URL pattern weights with cap
         val urlScore = urlMatches
-            .sumOf { it.weight.toDouble() }
+            .sumOf { RuleWeightPolicy.weight(it).toDouble() }
             .toFloat()
             .coerceAtMost(MAX_URL_CONTRIBUTION)
 
@@ -60,16 +60,16 @@ class RiskScorer {
      * Useful for displaying score details in the alert UI.
      */
     fun getScoreBreakdown(matchedKeywords: List<Keyword>): ScoreBreakdown {
-        val keywordMatches = matchedKeywords.filter { it.patternType == "KEYWORD" }
+        val keywordMatches = withoutOverlappingPhrases(matchedKeywords.filter { it.patternType == "KEYWORD" })
         val urlMatches = matchedKeywords.filter { it.patternType == "URL_PATTERN" }
 
         val keywordScore = keywordMatches
-            .sumOf { it.weight.toDouble() }
+            .sumOf { RuleWeightPolicy.weight(it).toDouble() }
             .toFloat()
             .coerceAtMost(MAX_KEYWORD_CONTRIBUTION)
 
         val urlScore = urlMatches
-            .sumOf { it.weight.toDouble() }
+            .sumOf { RuleWeightPolicy.weight(it).toDouble() }
             .toFloat()
             .coerceAtMost(MAX_URL_CONTRIBUTION)
 
@@ -92,4 +92,14 @@ class RiskScorer {
         val keywordCount: Int,
         val urlCount: Int
     )
+
+    private fun withoutOverlappingPhrases(matches: List<Keyword>): List<Keyword> =
+        matches.filter { candidate ->
+            val phrase = candidate.pattern.trim().lowercase()
+            matches.none { other ->
+                other !== candidate && other.pattern.length > candidate.pattern.length &&
+                    Regex("(?<![\\p{L}\\p{N}])${Regex.escape(phrase)}(?![\\p{L}\\p{N}])")
+                        .containsMatchIn(other.pattern.lowercase())
+            }
+        }
 }

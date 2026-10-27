@@ -11,9 +11,9 @@ import org.junit.Test
 
 class ContactVerdictTest {
     @Test
-    fun savedContactClearsSuspiciousOnlyWithHighConfidenceLegitimateAnalysis() {
+    fun savedContactDoesNotAuthenticateSender() {
         assertVerdict(RiskLevel.SAFE, false, RiskLevel.SUSPICIOUS, legitimate("HIGH"), true)
-        assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SUSPICIOUS, legitimate("HIGH"), false)
+        assertVerdict(RiskLevel.SAFE, false, RiskLevel.SUSPICIOUS, legitimate("HIGH"), false)
         assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SUSPICIOUS, legitimate("MEDIUM"), true)
         assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SUSPICIOUS, legitimate("LOW"), true)
         assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SUSPICIOUS, GemmaResult.fallback(), true)
@@ -29,7 +29,7 @@ class ContactVerdictTest {
         assertTrue(strongSignal.isFlagged)
 
         assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SCAM, legitimate("HIGH"), true)
-        assertVerdict(RiskLevel.SCAM, true, RiskLevel.SUSPICIOUS,
+        assertVerdict(RiskLevel.SUSPICIOUS, true, RiskLevel.SUSPICIOUS,
             GemmaResult(Constants.GEMMA_SCAM, "HIGH", "Scam evidence."), true)
     }
 
@@ -37,6 +37,9 @@ class ContactVerdictTest {
     fun credentialRequestsAndHighWeightUrlsBlockContactClearance() {
         assertTrue(MessageSignals.hasStrongRuleSignal("Send your OTP now", emptyList()))
         assertTrue(MessageSignals.hasStrongRuleSignal("Open this link", listOf(
+            Keyword(pattern = "bdo-verify", patternType = "URL_PATTERN", weight = 40f)
+        )))
+        assertFalse(MessageSignals.hasStrongRuleSignal("Open this link", listOf(
             Keyword(pattern = "bit.ly", patternType = "URL_PATTERN", weight = 35f)
         )))
         assertFalse(MessageSignals.hasStrongRuleSignal("Your appointment is tomorrow", listOf(

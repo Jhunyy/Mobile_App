@@ -57,6 +57,8 @@ class MessageListAdapter(
                     ProcessingState.AI_ANALYZING.name
                 )
                 val rulesPending = message.processingState == ProcessingState.PENDING.name
+                val unverified = message.finalClassification == "UNVERIFIED"
+                val localOnly = message.verdictSource == "LOCAL_RULES"
 
                 textSender.text = message.senderAddress?.let { contactNames[it] ?: it }
                     ?: context.getString(R.string.unknown_sender)
@@ -68,7 +70,7 @@ class MessageListAdapter(
                 textTime.text = formatTime(message.receivedAt)
 
                 val indicatorColor = when {
-                    rulesPending -> ContextCompat.getColor(context, R.color.inbox_pending)
+                    rulesPending || unverified -> ContextCompat.getColor(context, R.color.inbox_pending)
                     message.finalClassification == Constants.RISK_SCAM ->
                         ContextCompat.getColor(context, R.color.inbox_scam)
                     message.finalClassification == Constants.RISK_SUSPICIOUS ->
@@ -87,11 +89,13 @@ class MessageListAdapter(
                 textRiskBadge.visibility = View.VISIBLE
                 textRiskBadge.text = when {
                     rulesPending -> "ANALYZING"
+                    unverified -> "UNVERIFIED · ${if (message.detectionState == "REMOTE_UNAVAILABLE") "AI UNAVAILABLE" else "RULES ONLY"}"
                     pending -> "${message.finalClassification} · AI PENDING"
-                    else -> message.finalClassification
+                    localOnly -> "${message.finalClassification} · RULES ONLY"
+                    else -> "${message.finalClassification} · REMOTE AI"
                 }
                 val badgeBackground = when {
-                    rulesPending -> R.drawable.bg_inbox_badge_pending
+                    rulesPending || unverified -> R.drawable.bg_inbox_badge_pending
                     message.finalClassification == Constants.RISK_SCAM -> R.drawable.bg_inbox_badge_scam
                     message.finalClassification == Constants.RISK_SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
                     else -> R.drawable.bg_inbox_badge_safe

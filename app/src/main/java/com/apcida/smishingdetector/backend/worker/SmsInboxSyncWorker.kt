@@ -73,7 +73,8 @@ class SmsInboxSyncWorker(
                             messageBody = body,
                             receivedAt = receivedAt,
                             sourceSmsId = smsId,
-                            alertOnDetection = false
+                            alertOnDetection = false,
+                            historicalImport = true
                         )
                         if (result.shouldEnqueueAi) {
                             SmsProcessingWorker.enqueue(applicationContext, result.messageId)
@@ -96,7 +97,7 @@ class SmsInboxSyncWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            Log.e(TAG, "Stored SMS sync failed after checking $examined messages.", error)
+            Log.e(TAG, "Stored SMS sync failed after checking $examined messages.")
             Result.retry()
         }
     }

@@ -12,7 +12,7 @@ import androidx.navigation.fragment.NavHostFragment
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
-import com.apcida.smishingdetector.backend.gemma.GemmaManager
+import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         seedDatabase()
-        loadGemmaModel()
+        showConsentOnboardingIfNeeded()
         recoverOrphanedAiWork()
         ReportUploadWorker.enqueue(applicationContext)
         requestRequiredPermissions()
@@ -122,23 +122,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadGemmaModel() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                GemmaManager.loadModel(applicationContext)
-                Log.d(TAG, "Gemma model load attempted.")
-            } catch (e: Exception) {
-                Log.e(
-                    TAG,
-                    "Gemma model load failed: ${e.message}"
-                )
-            }
+    private fun showConsentOnboardingIfNeeded() {
+        if (!AiProtectionConsentStore(this).hasSeenDisclosure() &&
+            navController.currentDestination?.id != R.id.onboardingFragment) {
+            navController.navigate(R.id.onboardingFragment)
         }
     }
 
     private fun recoverOrphanedAiWork() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                AiProtectionConsentStore(applicationContext).reconcileRevokedPending()
                 SmsProcessingWorker.recoverOrphaned(applicationContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Unable to recover pending AI analysis.", e)
@@ -148,9 +142,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestRequiredPermissions() {
         if (!PermissionHelper.hasSmsPermissions(this)) {
-
-            PermissionHelper.requestSmsPermissions(this)
-
+            // Explain SMS permission and remote consent in onboarding before requesting either.
         } else {
 
             Log.d(TAG, "SMS permissions already granted.")

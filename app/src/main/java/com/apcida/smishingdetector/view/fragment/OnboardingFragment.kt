@@ -9,6 +9,8 @@ import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ActivityOnboardingBinding
 import com.apcida.smishingdetector.util.PermissionHelper
+import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import android.widget.Toast
 
 class OnboardingFragment : Fragment() {
 
@@ -27,13 +29,8 @@ class OnboardingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // If permissions already granted skip onboarding
-        if (PermissionHelper.hasSmsPermissions(requireContext())) {
-            showVerifiedState()
-            return
-        }
-
         setupButtons()
+        if (PermissionHelper.hasSmsPermissions(requireContext())) showVerifiedState()
     }
 
     private fun setupButtons() {
@@ -45,12 +42,20 @@ class OnboardingFragment : Fragment() {
             }
 
             // Skip button
-            textSkip.setOnClickListener {
-                navigateToMessages()
-            }
+            textSkip.setOnClickListener { continueLocally() }
+            textLimitedProtection.setOnClickListener { continueLocally() }
 
             // Done button (shown after verification)
             btnDone.setOnClickListener {
+                if (!checkAiConsent.isChecked) {
+                    Toast.makeText(requireContext(), "Check the consent box to enable AI Protection.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (!PermissionHelper.hasSmsPermissions(requireContext())) {
+                    Toast.makeText(requireContext(), "SMS permission is required first.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                AiProtectionConsentStore(requireContext()).grant()
                 navigateToMessages()
             }
         }
@@ -77,6 +82,11 @@ class OnboardingFragment : Fragment() {
             // Show verified state
             layoutVerified.visibility = View.VISIBLE
         }
+    }
+
+    private fun continueLocally() {
+        AiProtectionConsentStore(requireContext()).markDisclosureSeen()
+        navigateToMessages()
     }
 
     private fun navigateToMessages() {

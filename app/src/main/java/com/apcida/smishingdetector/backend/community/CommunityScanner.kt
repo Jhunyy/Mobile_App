@@ -5,19 +5,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.provider.Telephony
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.database.DatabaseSeeder
-import com.apcida.smishingdetector.backend.detection.FinalVerdictResolver
-import com.apcida.smishingdetector.backend.detection.KeywordEngine
-import com.apcida.smishingdetector.backend.detection.MessageSignals
-import com.apcida.smishingdetector.backend.detection.RiskScorer
-import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
-import com.apcida.smishingdetector.backend.gemma.GemmaManager
+import com.apcida.smishingdetector.backend.detection.BackendKeywordRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.coroutineContext
 
 data class ContributionCandidate(val id: String, val text: String, val predictedCategory: String)
@@ -39,6 +34,7 @@ data class CommunityScanResult(
 /** Reads recent SMS bodies on device; no sender addresses are queried or stored. */
 class CommunityScanner(private val context: Context) {
     companion object {
+        private const val TAG = "CommunityScanner"
         private const val SCAN_PREFS = "community_scan"
         private const val LAST_SMS_DATE = "last_sms_date"
         private const val LAST_SMS_ID = "last_sms_id"
@@ -65,13 +61,6 @@ class CommunityScanner(private val context: Context) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
                 throw SecurityException("SMS access is required to scan existing messages.")
             }
-            val database = AppDatabase.getInstance(context)
-            DatabaseSeeder(context, database).seedIfFirstLaunch()
-            val keywords = KeywordEngine(database.keywordDao())
-            val scorer = RiskScorer()
-            val thresholds = ThresholdEvaluator()
-            val validator = GemmaManager.getReadyValidator(context)
-            if (!validator.isReady()) throw IllegalStateException("On-device Gemma model is unavailable.")
             val deadline = SystemClock.elapsedRealtime() + MAX_SCAN_MILLIS
             val found = mutableListOf<ContributionCandidate>()
             val seenIds = excludedIds.toMutableSet()
@@ -80,7 +69,6 @@ class CommunityScanner(private val context: Context) {
             var safeCount = 0
             var examined = 0
             var analyzed = 0
-            var consecutiveFailures = 0
             var stopReason = CommunityScanResult.StopReason.FINISHED
             suspend fun reportProgress(analyzing: Boolean = false) =
                 onProgress(CommunityScanProgress(examined, analyzed, found.size, analyzing))
@@ -141,42 +129,13 @@ class CommunityScanner(private val context: Context) {
                     if (!CommunityPolicy.eligible(body)) continue
                     val id = CommunityPolicy.fingerprint(body)
                     if (!seenIds.add(id) || !seenTemplates.add(CommunityPolicy.template(body))) continue
-                    val matches = keywords.analyze(body)
-                    val ruleLevel = thresholds.evaluate(scorer.compute(matches))
-                    val remainingTime = deadline - SystemClock.elapsedRealtime()
-                    if (remainingTime <= 0) {
-                        stopReason = CommunityScanResult.StopReason.TIME_LIMIT
-                        lastChecked = previousMarker
-                        examined--
-                        break
-                    }
-                    reportProgress(analyzing = true)
-                    val gemma = withTimeoutOrNull(minOf(MAX_INFERENCE_MILLIS, remainingTime)) {
-                        validator.validate(body, matches.map { keyword -> keyword.pattern })
-                    }
+                    val rules = BackendKeywordRules.analyze(body)
                     analyzed++
-                    reportProgress()
-                    if (gemma == null && SystemClock.elapsedRealtime() >= deadline) {
-                        stopReason = CommunityScanResult.StopReason.TIME_LIMIT
-                        lastChecked = previousMarker
-                        examined--
-                        break
-                    }
-                    if (gemma?.isSuccessful != true) {
-                        consecutiveFailures++
-                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                            stopReason = CommunityScanResult.StopReason.MODEL_FAILURE
-                            break
-                        }
-                        continue
-                    }
-                    consecutiveFailures = 0
-                    val verdict = FinalVerdictResolver.resolve(
-                        ruleLevel, gemma, isSavedContact = false,
-                        hasStrongRuleSignal = MessageSignals.hasStrongRuleSignal(body, matches)
-                    ).riskLevel
-                    val category = CommunityPolicy.candidateCategory(ruleLevel, gemma, verdict,
-                        scamRemaining - scamCount, safeRemaining - safeCount) ?: continue
+                    val category = when {
+                        rules.classification.name == "SCAM" && scamCount < scamRemaining -> "SCAM"
+                        rules.classification.name == "SAFE" && safeCount < safeRemaining -> "UNVERIFIED"
+                        else -> null
+                    } ?: continue
                     val redacted = CommunityPolicy.redact(body)
                     if (redacted.isBlank()) continue
                     found += ContributionCandidate(id, redacted, category)

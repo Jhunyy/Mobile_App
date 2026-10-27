@@ -22,7 +22,8 @@ object CombinedRiskScorer {
         hasStrongRuleSignal: Boolean,
         historyPoints: Int,
         senderPoints: Int,
-        gemmaResult: GemmaResult? = null
+        gemmaResult: GemmaResult? = null,
+        isLowEvidenceMessage: Boolean = false
     ): Breakdown {
         val keywordPoints = when {
             ruleScore >= 60f -> 25
@@ -31,7 +32,8 @@ object CombinedRiskScorer {
             else -> 0
         }
         val aiPoints = when {
-            gemmaResult?.isSuccessful != true || gemmaResult.classification != Constants.GEMMA_SCAM -> 0
+            isLowEvidenceMessage || gemmaResult?.isSuccessful != true ||
+                gemmaResult.classification != Constants.GEMMA_SCAM -> 0
             gemmaResult.confidence in setOf(Constants.CONFIDENCE_HIGH, Constants.CONFIDENCE_MEDIUM) -> 60
             gemmaResult.confidence == Constants.CONFIDENCE_LOW -> 30
             else -> 0

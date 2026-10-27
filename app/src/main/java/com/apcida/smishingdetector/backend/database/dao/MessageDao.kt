@@ -45,7 +45,16 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE message_id = :messageId")
     fun observeMessageById(messageId: Long): Flow<Message?>
 
-    @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before")
+    @Query("""
+        UPDATE messages SET processing_state = 'REMOTE_CONSENT_DISABLED',
+            detection_state = 'REMOTE_CONSENT_DISABLED',
+            final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END
+        WHERE verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING')
+          AND consent_generation < :currentGeneration
+    """)
+    suspend fun markPendingRemoteConsentDisabled(currentGeneration: Long)
+
+    @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before AND verdict_source = 'LOCAL_RULES' AND consent_generation > 0")
     suspend fun getStaleAiMessageIds(before: Long): List<Long>
 
     @Query(

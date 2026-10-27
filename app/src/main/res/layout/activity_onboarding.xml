@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            app:layout_constraintGuide_begin="283dp" />
+            app:layout_constraintGuide_begin="100dp" />
 
         <!-- Kept for compatibility with existing Kotlin -->
         <ImageView
@@ -57,7 +57,7 @@
             android:layout_marginTop="20dp"
             android:fontFamily="@font/dm_sans_regular"
             android:lineSpacingExtra="4dp"
-            android:text="deTEXT needs access to your SMS inbox to detect suspicious messages in real time.&#10;&#10;Message analysis happens on your device. Contact names are optional and requested separately."
+            android:text="ApCiDa uses local keyword checks immediately. Full AI Protection sends each new SMS text, sender, receipt time, and request ID to the remote Gemma 3 12B + RAG server after you consent. If the server is unavailable, only local warnings are available. You can stop future remote analysis in Settings. SMS permission alone does not enable remote analysis. Research contribution is separate."
             android:textColor="@color/text_secondary"
             android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"
@@ -189,7 +189,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="22dp"
                     android:fontFamily="@font/dm_sans_bold"
-                    android:text="Verification Complete"
+                    android:text="Choose AI Protection"
                     android:textColor="@color/text_primary"
                     android:textSize="26sp" />
 
@@ -199,9 +199,28 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:fontFamily="@font/dm_sans_regular"
-                    android:text="Your device has been verified."
+                    android:text="When enabled, each newly received SMS is sent automatically for remote analysis. Already sent requests cannot be recalled. The service is not yet securely configured, so automatic sending remains disabled while you can use local keyword warnings."
                     android:textColor="@color/text_secondary"
                     android:textSize="16sp" />
+
+                <CheckBox
+                    android:id="@+id/check_ai_consent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:checked="false"
+                    android:text="I agree to ongoing remote analysis of new SMS messages"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/text_limited_protection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:padding="8dp"
+                    android:text="Continue with keyword-only protection"
+                    android:textColor="@color/text_secondary" />
 
                 <!-- Done button -->
                 <com.google.android.material.button.MaterialButton
@@ -210,7 +229,7 @@
                     android:layout_height="56dp"
                     android:layout_marginTop="32dp"
                     android:fontFamily="@font/dm_sans_semibold"
-                    android:text="Done"
+                    android:text="Enable AI Protection"
                     android:textAllCaps="false"
                     android:textColor="@color/white"
                     android:textSize="16sp"

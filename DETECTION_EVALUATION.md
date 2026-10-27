@@ -16,7 +16,7 @@ Record for each message: a stable ID, redacted text, language (English, Filipino
 
 Include hard legitimate examples: routine OTP delivery, bank notices, delivery updates, appointment reminders, and promotional messages. Include scam examples with unfamiliar wording and no seeded keyword. Do not label a message SCAM solely because it has an unfamiliar domain, poor grammar, urgency, or a brand name.
 
-Evaluate the saved-contact verdict override separately. The raw rule score is unchanged. A rule-SUSPICIOUS message can become SAFE only when the sender was a saved contact at intake, Gemma returns LEGITIMATE with HIGH confidence, the rule pass found no strong signal, and the combined score does not require a SUSPICIOUS warning. Strong signals include a credential or payment request, or a URL indicator weighted at least 30. Test routine messages, spoofed numbers, risky requests, and suspicious links from saved contacts. Contact membership does not establish sender authenticity.
+Evaluate weak rule-warning clearance separately. A rule-SUSPICIOUS message can become SAFE when Gemma returns LEGITIMATE with HIGH confidence, the rule pass found no strong signal, and the combined score does not require a SUSPICIOUS warning. Saved-contact status is context, not authentication or a requirement for clearance. Strong signals include a credential or payment request, or a URL indicator weighted at least 30 after runtime caps.
 
 Evaluate the 0–100 combined point policy separately from the original keyword score and final verdict. Its 25-point SUSPICIOUS boundary and the 24-hour sender warning are initial policy settings, not calibrated probabilities. Include simple greetings with and without a prior confirmed scam, short requests and links that must remain eligible for scam detection, benign follow-ups to a scam, and conversations that cross the 24-hour and 48-hour boundaries. Split whole sender conversations across training and test sets to avoid leaking earlier texts into both. Check whether the bounded prompt fits the model's token limit and whether history improves recall without raising false alerts excessively.
 
@@ -28,9 +28,9 @@ Evaluate the 0–100 combined point policy separately from the original keyword 
 4. Record median and 95th-percentile time from SMS receipt to final verdict on the target phone, plus model load failures and peak memory where measurable.
 5. Review missed scams and false alerts. Make one documented change at a time and compare it against the frozen test set. Set release targets only after measuring the baseline and the acceptable alert burden with users.
 
-Gemma's HIGH/MEDIUM/LOW field is self-reported and must not be interpreted as a measured probability. If fine-tuning is attempted, use only the training split; compare the tuned model with the original on the untouched test set and on the actual device before adopting it.
+Gemma's HIGH/MEDIUM/LOW field is self-reported and must not be interpreted as a measured probability. Community candidates are preselected using high-confidence model outputs and participant review; they are not an unbiased accuracy test set. Only independent researcher labels can serve as evaluation references. This change does not fine-tune or replace Gemma.
 
-Regression example: `Hi! Just reminding you that our meeting is tomorrow at 10 AM. See you then.` has a rule-SAFE result when its score is zero. The final result is SAFE if Gemma returns LEGITIMATE with HIGH or MEDIUM confidence, but SUSPICIOUS if Gemma returns SCAM with LOW confidence or is unavailable. That SUSPICIOUS result is an alert-policy choice, not evidence that the reminder is a scam. Keep this example in the fixed regression set and measure its false-alert cost alongside varied real reminders.
+Regression example: a rule-SAFE reminder remains SAFE when Gemma is unavailable, because failure supplies no scam evidence. A Gemma SCAM answer can still prompt a SUSPICIOUS warning when the message contains an action or fraud cue. Measure those warnings alongside varied real reminders.
 
 ## Known implementation limit
 

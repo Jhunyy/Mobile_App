@@ -54,11 +54,11 @@ object NotificationHelper {
         }
         val explanation = when {
             isRuleOnlyWarning ->
-                "Rule analysis found strong scam indicators. AI analysis will refine the result."
+                "Local rules found strong scam indicators. Remote AI has not verified this message."
             result.riskLevel == RiskLevel.SUSPICIOUS ->
-                "AI reduced the initial high-risk warning to suspicious, but the message is not safe."
+                "Remote AI marked this message suspicious. Review it before taking action."
             else ->
-                "Rule and AI results indicate a scam. Review the result before taking action."
+                "Remote AI marked this message as a potential scam. Review the result before taking action."
         }
         val notification = NotificationCompat.Builder(context, SCAM_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_warning)
@@ -72,11 +72,16 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(pendingIntent)
             .build()
 
         NotificationManagerCompat.from(context)
             .notify(messageId.toInt(), notification)
+    }
+
+    fun cancelAlert(context: Context, messageId: Long) {
+        NotificationManagerCompat.from(context).cancel(messageId.toInt())
     }
 
     private fun canPostNotifications(context: Context): Boolean {

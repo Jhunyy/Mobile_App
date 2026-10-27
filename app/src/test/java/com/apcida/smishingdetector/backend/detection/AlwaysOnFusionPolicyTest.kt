@@ -28,8 +28,8 @@ class AlwaysOnFusionPolicyTest {
     }
 
     @Test
-    fun ruleSafeAndAiScam_isScam() {
-        assertVerdict(RiskLevel.SAFE, scam(), RiskLevel.SCAM, true)
+    fun ruleSafeAndAiScam_requiresIndependentEvidenceForDefinitiveScam() {
+        assertVerdict(RiskLevel.SAFE, scam(), RiskLevel.SUSPICIOUS, true)
     }
 
     @Test
@@ -39,8 +39,8 @@ class AlwaysOnFusionPolicyTest {
     }
 
     @Test
-    fun ruleSuspiciousAndAiLegitimate_remainsSuspicious() {
-        assertVerdict(RiskLevel.SUSPICIOUS, legitimate(), RiskLevel.SUSPICIOUS, true)
+    fun weakRuleWarningCanClearWithHighConfidenceLegitimateAnalysis() {
+        assertVerdict(RiskLevel.SUSPICIOUS, legitimate(), RiskLevel.SAFE, false)
     }
 
     @Test
@@ -49,9 +49,9 @@ class AlwaysOnFusionPolicyTest {
     }
 
     @Test
-    fun aiUnavailable_preservesHighRiskAndKeepsRuleSafeUnderReview() {
+    fun aiUnavailablePreservesRuleVerdictWithoutInventingRisk() {
         assertVerdict(RiskLevel.SCAM, GemmaResult.fallback(), RiskLevel.SCAM, true)
-        assertVerdict(RiskLevel.SAFE, GemmaResult.fallback(), RiskLevel.SUSPICIOUS, true)
+        assertVerdict(RiskLevel.SAFE, GemmaResult.fallback(), RiskLevel.SAFE, false)
     }
 
     private fun assertVerdict(

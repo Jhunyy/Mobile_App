@@ -45,6 +45,15 @@ class CombinedRiskScorerTest {
     }
 
     @Test
+    fun unsupportedModelScamDoesNotCreatePointsForNeutralConversation() {
+        val result = CombinedRiskScorer.score(0f, false, 0, 0,
+            GemmaResult("SCAM", "HIGH", "Unsupported suspicion"),
+            isLowEvidenceMessage = true)
+        assertEquals(0, result.aiPoints)
+        assertEquals(0, result.total)
+    }
+
+    @Test
     fun twentyFivePointsWarnsWithoutPromotingSuspicionToScam() {
         assertEquals(RiskLevel.SAFE, CombinedRiskScorer.withSuspiciousFloor(RiskLevel.SAFE, 24))
         assertEquals(RiskLevel.SUSPICIOUS, CombinedRiskScorer.withSuspiciousFloor(RiskLevel.SAFE, 25))

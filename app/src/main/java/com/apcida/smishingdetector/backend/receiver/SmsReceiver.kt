@@ -53,7 +53,7 @@ class SmsReceiver : BroadcastReceiver() {
                     }
                 }
             } catch (error: Exception) {
-                Log.e(TAG, "Unable to persist and queue an incoming SMS.", error)
+                Log.e(TAG, "Unable to persist an incoming SMS; local analysis unavailable.")
             } finally {
                 pendingResult.finish()
             }

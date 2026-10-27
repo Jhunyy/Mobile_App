@@ -2,76 +2,76 @@
 <keywords>
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- PRIZE / REWARD LANGUAGE — Weight: 30               -->
+    <!-- PRIZE / REWARD LANGUAGE — specific claims carry more weight -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
-    <keyword pattern="you have won" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="you won" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="claim your prize" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="claim prize" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="congratulations you" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="winner" type="KEYWORD" weight="30" language="ENGLISH"/>
-    <keyword pattern="reward" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="free gift" type="KEYWORD" weight="30" language="ENGLISH"/>
+    <keyword pattern="you have won" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="you won" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="claim your prize" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="claim prize" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="congratulations you" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="winner" type="KEYWORD" weight="5" language="ENGLISH"/>
+    <keyword pattern="reward" type="KEYWORD" weight="5" language="ENGLISH"/>
+    <keyword pattern="free gift" type="KEYWORD" weight="5" language="ENGLISH"/>
 
     <!-- Filipino -->
-    <keyword pattern="nanalo ka" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="manalo" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="premyo" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="libreng" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="napanalunan mo" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="panalo ka" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="kunin ang premyo" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="i-claim ang premyo" type="KEYWORD" weight="30" language="FILIPINO"/>
-    <keyword pattern="may premyo ka" type="KEYWORD" weight="25" language="FILIPINO"/>
+    <keyword pattern="nanalo ka" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="manalo" type="KEYWORD" weight="5" language="FILIPINO"/>
+    <keyword pattern="premyo" type="KEYWORD" weight="5" language="FILIPINO"/>
+    <keyword pattern="libreng" type="KEYWORD" weight="5" language="FILIPINO"/>
+    <keyword pattern="napanalunan mo" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="panalo ka" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="kunin ang premyo" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="i-claim ang premyo" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="may premyo ka" type="KEYWORD" weight="20" language="FILIPINO"/>
 
     <!-- Cebuano -->
-    <keyword pattern="nakadaog ka" type="KEYWORD" weight="30" language="CEBUANO"/>
-    <keyword pattern="daog ka" type="KEYWORD" weight="30" language="CEBUANO"/>
-    <keyword pattern="premyo nimo" type="KEYWORD" weight="30" language="CEBUANO"/>
-    <keyword pattern="kuhaa ang premyo" type="KEYWORD" weight="30" language="CEBUANO"/>
-    <keyword pattern="i-claim ang imong premyo" type="KEYWORD" weight="30" language="CEBUANO"/>
-    <keyword pattern="libre nga regalo" type="KEYWORD" weight="25" language="CEBUANO"/>
+    <keyword pattern="nakadaog ka" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="daog ka" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="premyo nimo" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="kuhaa ang premyo" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="i-claim ang imong premyo" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="libre nga regalo" type="KEYWORD" weight="5" language="CEBUANO"/>
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- URGENCY LANGUAGE — Weight: 25                      -->
+    <!-- URGENCY LANGUAGE — weak without a deceptive request -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
-    <keyword pattern="act now" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="act immediately" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="expires today" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="limited time" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="urgent" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="immediately" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="last chance" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="expires" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="deadline" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="act now" type="KEYWORD" weight="12" language="ENGLISH"/>
+    <keyword pattern="act immediately" type="KEYWORD" weight="12" language="ENGLISH"/>
+    <keyword pattern="expires today" type="KEYWORD" weight="12" language="ENGLISH"/>
+    <keyword pattern="limited time" type="KEYWORD" weight="12" language="ENGLISH"/>
+    <keyword pattern="urgent" type="KEYWORD" weight="8" language="ENGLISH"/>
+    <keyword pattern="immediately" type="KEYWORD" weight="8" language="ENGLISH"/>
+    <keyword pattern="last chance" type="KEYWORD" weight="12" language="ENGLISH"/>
+    <keyword pattern="expires" type="KEYWORD" weight="8" language="ENGLISH"/>
+    <keyword pattern="deadline" type="KEYWORD" weight="8" language="ENGLISH"/>
 
     <!-- Filipino -->
-    <keyword pattern="agad" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="ngayon na" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="huwag palampasin" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="mag-claim na" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="kaagad" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="agad-agad" type="KEYWORD" weight="25" language="FILIPINO"/>
-    <keyword pattern="kailangan ngayon" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="sa loob ng 24 oras" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="agad" type="KEYWORD" weight="8" language="FILIPINO"/>
+    <keyword pattern="ngayon na" type="KEYWORD" weight="12" language="FILIPINO"/>
+    <keyword pattern="huwag palampasin" type="KEYWORD" weight="12" language="FILIPINO"/>
+    <keyword pattern="mag-claim na" type="KEYWORD" weight="12" language="FILIPINO"/>
+    <keyword pattern="kaagad" type="KEYWORD" weight="8" language="FILIPINO"/>
+    <keyword pattern="agad-agad" type="KEYWORD" weight="8" language="FILIPINO"/>
+    <keyword pattern="kailangan ngayon" type="KEYWORD" weight="12" language="FILIPINO"/>
+    <keyword pattern="sa loob ng 24 oras" type="KEYWORD" weight="12" language="FILIPINO"/>
     <keyword pattern="bago mahuli ang lahat" type="KEYWORD" weight="25" language="FILIPINO"/>
 
     <!-- Cebuano -->
-    <keyword pattern="dayon" type="KEYWORD" weight="25" language="CEBUANO"/>
-    <keyword pattern="karon na" type="KEYWORD" weight="25" language="CEBUANO"/>
-    <keyword pattern="dali" type="KEYWORD" weight="15" language="CEBUANO"/>
-    <keyword pattern="ayaw palabya" type="KEYWORD" weight="25" language="CEBUANO"/>
-    <keyword pattern="sulod sa 24 oras" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="karong adlawa" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="dayon" type="KEYWORD" weight="8" language="CEBUANO"/>
+    <keyword pattern="karon na" type="KEYWORD" weight="12" language="CEBUANO"/>
+    <keyword pattern="dali" type="KEYWORD" weight="8" language="CEBUANO"/>
+    <keyword pattern="ayaw palabya" type="KEYWORD" weight="12" language="CEBUANO"/>
+    <keyword pattern="sulod sa 24 oras" type="KEYWORD" weight="12" language="CEBUANO"/>
+    <keyword pattern="karong adlawa" type="KEYWORD" weight="12" language="CEBUANO"/>
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- BANK / ACCOUNT IMPERSONATION — Weight: 20          -->
+    <!-- BANK / ACCOUNT LANGUAGE — brand names alone score zero -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
@@ -80,15 +80,15 @@
     <keyword pattern="account suspended" type="KEYWORD" weight="20" language="ENGLISH"/>
     <keyword pattern="verify your account" type="KEYWORD" weight="20" language="ENGLISH"/>
     <keyword pattern="confirm your account" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="your account" type="KEYWORD" weight="10" language="ENGLISH"/>
-    <keyword pattern="gcash" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="bdo" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="bpi" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="metrobank" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="bank account" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="your account" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="gcash" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="bdo" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="bpi" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="metrobank" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="bank account" type="KEYWORD" weight="0" language="ENGLISH"/>
 
     <!-- Filipino -->
-    <keyword pattern="i-verify" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="i-verify" type="KEYWORD" weight="8" language="FILIPINO"/>
     <keyword pattern="na-lock ang iyong" type="KEYWORD" weight="20" language="FILIPINO"/>
     <keyword pattern="i-update ang iyong" type="KEYWORD" weight="20" language="FILIPINO"/>
     <keyword pattern="ma-lock ang account mo" type="KEYWORD" weight="20" language="FILIPINO"/>
@@ -105,11 +105,11 @@
     <keyword pattern="i-verify imong account" type="KEYWORD" weight="20" language="CEBUANO"/>
     <keyword pattern="i-update imong account" type="KEYWORD" weight="20" language="CEBUANO"/>
     <keyword pattern="kumpirmaha imong account" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="imong bank account" type="KEYWORD" weight="15" language="CEBUANO"/>
+    <keyword pattern="imong bank account" type="KEYWORD" weight="0" language="CEBUANO"/>
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- PERSONAL INFORMATION REQUESTS — Weight: 25         -->
+    <!-- PERSONAL INFORMATION REQUESTS -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
@@ -117,9 +117,9 @@
     <keyword pattern="enter your otp" type="KEYWORD" weight="25" language="ENGLISH"/>
     <keyword pattern="provide your password" type="KEYWORD" weight="25" language="ENGLISH"/>
     <keyword pattern="your pin" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="social security" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="credit card number" type="KEYWORD" weight="25" language="ENGLISH"/>
-    <keyword pattern="personal information" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="social security" type="KEYWORD" weight="5" language="ENGLISH"/>
+    <keyword pattern="credit card number" type="KEYWORD" weight="5" language="ENGLISH"/>
+    <keyword pattern="personal information" type="KEYWORD" weight="5" language="ENGLISH"/>
 
     <!-- Filipino -->
     <keyword pattern="ibigay ang iyong" type="KEYWORD" weight="25" language="FILIPINO"/>
@@ -140,83 +140,83 @@
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- DELIVERY / PARCEL SCAM — Weight: 20                -->
+    <!-- DELIVERY / PARCEL LANGUAGE — routine notices score little -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
-    <keyword pattern="your parcel" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="your package" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="pending delivery" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="failed delivery" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="reschedule delivery" type="KEYWORD" weight="20" language="ENGLISH"/>
-    <keyword pattern="track your package" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="delivery fee" type="KEYWORD" weight="20" language="ENGLISH"/>
+    <keyword pattern="your parcel" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="your package" type="KEYWORD" weight="0" language="ENGLISH"/>
+    <keyword pattern="pending delivery" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="failed delivery" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="reschedule delivery" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="track your package" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="delivery fee" type="KEYWORD" weight="10" language="ENGLISH"/>
 
     <!-- Filipino -->
-    <keyword pattern="ang iyong package" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="ang iyong parcel" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="ang iyong pakete" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="hindi na-deliver" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="nabigong delivery" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="ang iyong package" type="KEYWORD" weight="0" language="FILIPINO"/>
+    <keyword pattern="ang iyong parcel" type="KEYWORD" weight="0" language="FILIPINO"/>
+    <keyword pattern="ang iyong pakete" type="KEYWORD" weight="0" language="FILIPINO"/>
+    <keyword pattern="hindi na-deliver" type="KEYWORD" weight="10" language="FILIPINO"/>
+    <keyword pattern="nabigong delivery" type="KEYWORD" weight="10" language="FILIPINO"/>
     <keyword pattern="bayaran ang delivery fee" type="KEYWORD" weight="20" language="FILIPINO"/>
-    <keyword pattern="i-reschedule ang iyong delivery" type="KEYWORD" weight="20" language="FILIPINO"/>
+    <keyword pattern="i-reschedule ang iyong delivery" type="KEYWORD" weight="10" language="FILIPINO"/>
 
     <!-- Cebuano -->
-    <keyword pattern="imong parcel" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="imong package" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="wala nadeliver" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="napakyas ang delivery" type="KEYWORD" weight="20" language="CEBUANO"/>
+    <keyword pattern="imong parcel" type="KEYWORD" weight="0" language="CEBUANO"/>
+    <keyword pattern="imong package" type="KEYWORD" weight="0" language="CEBUANO"/>
+    <keyword pattern="wala nadeliver" type="KEYWORD" weight="10" language="CEBUANO"/>
+    <keyword pattern="napakyas ang delivery" type="KEYWORD" weight="10" language="CEBUANO"/>
     <keyword pattern="bayri ang delivery fee" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="usba ang schedule sa delivery" type="KEYWORD" weight="20" language="CEBUANO"/>
-    <keyword pattern="i-track imong package" type="KEYWORD" weight="15" language="CEBUANO"/>
+    <keyword pattern="usba ang schedule sa delivery" type="KEYWORD" weight="10" language="CEBUANO"/>
+    <keyword pattern="i-track imong package" type="KEYWORD" weight="10" language="CEBUANO"/>
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- SHORTENED / SUSPICIOUS URLs — Weight: 35           -->
+    <!-- SHORTENED URLs — shortener alone is weak evidence -->
     <!-- ═══════════════════════════════════════════════════ -->
 
-    <keyword pattern="bit.ly" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="tinyurl.com" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="t.co" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="rb.gy" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="shorturl.at" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="cutt.ly" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="is.gd" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="ow.ly" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern="buff.ly" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-
-
-    <!-- ═══════════════════════════════════════════════════ -->
-    <!-- SUSPICIOUS DOMAIN PATTERNS — Weight: 40            -->
-    <!-- ═══════════════════════════════════════════════════ -->
-
-    <keyword pattern="gcash-promo" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="bdo-verify" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="bpi-secure" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="phil-post" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="login-verify" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="secure-login" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern="account-update" type="URL_PATTERN" weight="40" language="ENGLISH"/>
-    <keyword pattern=".xyz" type="URL_PATTERN" weight="30" language="ENGLISH"/>
-    <keyword pattern=".top" type="URL_PATTERN" weight="30" language="ENGLISH"/>
-    <keyword pattern=".click" type="URL_PATTERN" weight="35" language="ENGLISH"/>
-    <keyword pattern=".online" type="URL_PATTERN" weight="25" language="ENGLISH"/>
+    <keyword pattern="bit.ly" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="tinyurl.com" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="t.co" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="rb.gy" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="shorturl.at" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="cutt.ly" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="is.gd" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="ow.ly" type="URL_PATTERN" weight="15" language="ENGLISH"/>
+    <keyword pattern="buff.ly" type="URL_PATTERN" weight="15" language="ENGLISH"/>
 
 
     <!-- ═══════════════════════════════════════════════════ -->
-    <!-- AMBIGUOUS / ACTION TERMS — Weight: 10–15           -->
+    <!-- DOMAIN PATTERNS — suffix alone is weak evidence -->
+    <!-- ═══════════════════════════════════════════════════ -->
+
+    <keyword pattern="gcash-promo" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="bdo-verify" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="bpi-secure" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="phil-post" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="login-verify" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="secure-login" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern="account-update" type="URL_PATTERN" weight="30" language="ENGLISH"/>
+    <keyword pattern=".xyz" type="URL_PATTERN" weight="10" language="ENGLISH"/>
+    <keyword pattern=".top" type="URL_PATTERN" weight="10" language="ENGLISH"/>
+    <keyword pattern=".click" type="URL_PATTERN" weight="10" language="ENGLISH"/>
+    <keyword pattern=".online" type="URL_PATTERN" weight="10" language="ENGLISH"/>
+
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- AMBIGUOUS / ACTION TERMS — weak in isolation -->
     <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- English -->
-    <keyword pattern="verify" type="KEYWORD" weight="10" language="ENGLISH"/>
-    <keyword pattern="update" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="verify" type="KEYWORD" weight="8" language="ENGLISH"/>
+    <keyword pattern="update" type="KEYWORD" weight="8" language="ENGLISH"/>
     <keyword pattern="click here" type="KEYWORD" weight="10" language="ENGLISH"/>
     <keyword pattern="click the link" type="KEYWORD" weight="15" language="ENGLISH"/>
-    <keyword pattern="login" type="KEYWORD" weight="10" language="ENGLISH"/>
+    <keyword pattern="login" type="KEYWORD" weight="8" language="ENGLISH"/>
     <keyword pattern="log in" type="KEYWORD" weight="10" language="ENGLISH"/>
 
     <!-- Filipino -->
-    <keyword pattern="i-click" type="KEYWORD" weight="10" language="FILIPINO"/>
+    <keyword pattern="i-click" type="KEYWORD" weight="8" language="FILIPINO"/>
     <keyword pattern="pumunta sa link" type="KEYWORD" weight="15" language="FILIPINO"/>
     <keyword pattern="pindutin ang link" type="KEYWORD" weight="15" language="FILIPINO"/>
     <keyword pattern="buksan ang link" type="KEYWORD" weight="15" language="FILIPINO"/>

@@ -93,4 +93,26 @@ class GemmaOutputParserTest {
             )
         )
     }
+
+    @Test
+    fun parserRejectsExtraLinesAndOverlongReasonsWithoutProducingAScamVerdict() {
+        val extraLine = "Classification: SCAM\nConfidence: HIGH\n" +
+            "Reason: Send your OTP.\nAdditional claim: urgent"
+        val overlongReason = "Classification: SCAM\nConfidence: HIGH\nReason: " + "x".repeat(501)
+
+        for (raw in listOf(extraLine, overlongReason)) {
+            assertFalse(GemmaOutputParser.isValidFormat(raw))
+            val parsed = GemmaOutputParser.parse(raw)
+            assertFalse(parsed.isSuccessful)
+            assertEquals(Constants.GEMMA_UNCERTAIN, parsed.classification)
+        }
+    }
+
+    @Test
+    fun formatParserDoesNotMistakeSemanticAgreementForFormatValidity() {
+        val contradictory = "Classification: SCAM\nConfidence: HIGH\n" +
+            "Reason: There is no fraud indicator in this personal question."
+        assertTrue(GemmaOutputParser.isValidFormat(contradictory))
+        assertEquals(Constants.GEMMA_SCAM, GemmaOutputParser.parse(contradictory).classification)
+    }
 }

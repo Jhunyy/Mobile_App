@@ -1,438 +1,152 @@
 package com.apcida.smishingdetector.controller
 
 import android.content.Context
-import android.util.Log
+import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.consent.AutomaticAnalysisPolicy
 import com.apcida.smishingdetector.backend.database.AppDatabase
-import com.apcida.smishingdetector.backend.database.DatabaseSeeder
-import com.apcida.smishingdetector.backend.detection.AiEligibilityPolicy
-import com.apcida.smishingdetector.backend.detection.CombinedRiskScorer
-import com.apcida.smishingdetector.backend.detection.ConversationRiskPolicy
+import com.apcida.smishingdetector.backend.detection.BackendKeywordRules
 import com.apcida.smishingdetector.backend.detection.DuplicatePolicy
-import com.apcida.smishingdetector.backend.detection.FinalVerdictResolver
-import com.apcida.smishingdetector.backend.detection.KeywordEngine
-import com.apcida.smishingdetector.backend.detection.MessageSignals
-import com.apcida.smishingdetector.backend.detection.RiskScorer
-import com.apcida.smishingdetector.backend.detection.SenderSignals
-import com.apcida.smishingdetector.backend.detection.SimpleGreetingPolicy
-import com.apcida.smishingdetector.backend.detection.ThresholdEvaluator
-import com.apcida.smishingdetector.backend.gemma.GemmaManager
+import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.backend.network.RemoteVerdictPolicy
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.model.data.AiAnalysisStatus
 import com.apcida.smishingdetector.model.data.DetectionResult
-import com.apcida.smishingdetector.model.data.GemmaResult
+import com.apcida.smishingdetector.model.data.DetectionState
 import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.model.data.RiskLevel
-import com.apcida.smishingdetector.model.entity.Keyword
+import com.apcida.smishingdetector.model.data.VerdictSource
 import com.apcida.smishingdetector.model.entity.Message
-import com.apcida.smishingdetector.model.entity.MessageKeyword
-import com.apcida.smishingdetector.util.Constants
-import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.HashUtil
 import com.apcida.smishingdetector.util.NotificationHelper
-import kotlinx.coroutines.withTimeoutOrNull
+import java.util.UUID
 
+/** Incoming SMS: persist and warn locally first. Automatic transport remains security-gated. */
 class SmsController(context: Context) {
-
     data class IntakeResult(val messageId: Long, val shouldEnqueueAi: Boolean)
+    private val app = context.applicationContext
+    private val repository = MessageRepository(AppDatabase.getInstance(app).messageDao())
+    private val consent = AiProtectionConsentStore(app)
 
-    companion object {
-        private const val TAG = "SmsController"
-    }
-
-    private val applicationContext = context.applicationContext
-    private val database = AppDatabase.getInstance(applicationContext)
-    private val messageRepository = MessageRepository(database.messageDao())
-    private val keywordEngine = KeywordEngine(database.keywordDao())
-    private val riskScorer = RiskScorer()
-    private val thresholdEvaluator = ThresholdEvaluator()
-
-    /** Persists first, evaluates rules, and queues every non-duplicate SMS for AI. */
     suspend fun receiveAndAnalyzeRules(
         sender: String,
         messageBody: String,
         receivedAt: Long = System.currentTimeMillis(),
         sourceSmsId: Long? = null,
-        alertOnDetection: Boolean = true
+        alertOnDetection: Boolean = true,
+        historicalImport: Boolean = false
     ): IntakeResult {
-        DatabaseSeeder(applicationContext, database).seedIfFirstLaunch()
-
+        require(messageBody.isNotBlank())
         val senderHash = HashUtil.hashSender(sender)
         val contentHash = HashUtil.hashContent(messageBody)
         val duplicate = if (sourceSmsId != null) {
-            messageRepository.getMessageBySourceSmsId(sourceSmsId)
-                ?: messageRepository.findMatchingStoredSms(senderHash, contentHash, receivedAt)
-        } else {
-            messageRepository.findRecentDuplicate(
-                senderHash, contentHash, DuplicatePolicy.windowStart(receivedAt), receivedAt
-            )
-        }
+            repository.getMessageBySourceSmsId(sourceSmsId)
+                ?: repository.findMatchingStoredSms(senderHash, contentHash, receivedAt)
+        } else repository.findRecentDuplicate(senderHash, contentHash,
+            DuplicatePolicy.windowStart(receivedAt), receivedAt)
         if (duplicate != null) {
-            if (sourceSmsId != null && duplicate.sourceSmsId == null) {
-                messageRepository.bindSourceSmsId(duplicate.messageId, sourceSmsId)
-            }
-            if (duplicate.processingState != ProcessingState.PENDING.name) {
-                Log.d(TAG, "Suppressed a duplicate SMS.")
-                return IntakeResult(duplicate.messageId,
-                    shouldEnqueueAi = duplicate.processingState == ProcessingState.AI_QUEUED.name)
-            }
-            Log.d(TAG, "Resuming rules for a pending SMS.")
+            if (sourceSmsId != null && duplicate.sourceSmsId == null) repository.bindSourceSmsId(duplicate.messageId, sourceSmsId)
+            return IntakeResult(duplicate.messageId, false)
         }
-
-        val senderAddress = sender.takeIf { it.isNotBlank() && it != "Unknown" }
-        val newMessage = Message(
-            senderHash = senderHash, senderAddress = senderAddress, content = messageBody,
-            contentHash = contentHash, sourceSmsId = sourceSmsId,
+        val snapshot = consent.snapshot()
+        val rules = BackendKeywordRules.analyze(messageBody)
+        val eligible = AutomaticAnalysisPolicy.eligible(snapshot, receivedAt, historicalImport,
+            RemoteTransportGate.mayTransmit(null, false))
+        val state = when {
+            eligible -> DetectionState.REMOTE_PENDING
+            snapshot.enabled && !historicalImport && receivedAt >= snapshot.grantedAt -> DetectionState.REMOTE_UNAVAILABLE
+            else -> DetectionState.REMOTE_CONSENT_DISABLED
+        }
+        val localAssessment = RemoteVerdictPolicy.localFallback(rules.classification.name)
+        val message = Message(
+            senderHash = senderHash, senderAddress = sender.takeIf { it.isNotBlank() && it != "Unknown" },
+            content = messageBody, contentHash = contentHash, sourceSmsId = sourceSmsId,
             alertsEnabled = alertOnDetection, receivedAt = receivedAt,
-            processingState = ProcessingState.PENDING.name,
-            aiAnalysisStatus = AiAnalysisStatus.NOT_STARTED.name
+            riskScore = rules.score.toFloat(), riskLevel = rules.classification.name,
+            deterministicRiskLevel = rules.classification.name,
+            matchedIndicators = rules.matchedIndicators.joinToString("\n") { it.code },
+            hasStrongRuleSignal = rules.classification == RiskLevel.SCAM,
+            isFlagged = rules.classification != RiskLevel.SAFE,
+            finalClassification = localAssessment,
+            processingState = when (state) {
+                DetectionState.REMOTE_PENDING -> ProcessingState.AI_QUEUED.name
+                DetectionState.REMOTE_UNAVAILABLE -> ProcessingState.REMOTE_UNAVAILABLE.name
+                else -> ProcessingState.REMOTE_CONSENT_DISABLED.name
+            },
+            aiAnalysisStatus = if (state == DetectionState.REMOTE_UNAVAILABLE) AiAnalysisStatus.UNAVAILABLE.name else AiAnalysisStatus.NOT_STARTED.name,
+            detectionState = state.name, verdictSource = VerdictSource.LOCAL_RULES.name,
+            remoteRequestId = UUID.randomUUID().toString(), consentGeneration = if (eligible) snapshot.generation else 0
         )
-        val messageId = duplicate?.messageId ?: messageRepository.insertMessage(newMessage)
-        if (messageId <= 0 && sourceSmsId != null) {
-            val existing = messageRepository.getMessageBySourceSmsId(sourceSmsId)
-            if (existing != null) return IntakeResult(existing.messageId,
-                shouldEnqueueAi = existing.processingState == ProcessingState.AI_QUEUED.name)
+        val id = repository.insertMessage(message)
+        if (id <= 0) return IntakeResult(repository.getMessageBySourceSmsId(sourceSmsId ?: -1)?.messageId ?: 0, false)
+        if (alertOnDetection && rules.classification == RiskLevel.SCAM) {
+            NotificationHelper.showScamAlert(app, DetectionResult(
+                messageContent = messageBody, riskScore = rules.score.toFloat(),
+                riskLevel = RiskLevel.SCAM, isFlagged = true, matchedKeywords = emptyList(),
+                gemmaInvoked = false, finalClassification = "SCAM",
+                finalRationale = "Strong local keyword indicators. Remote AI has not verified this message."
+            ), id)
+            repository.updateMessage(message.copy(messageId = id, notificationPosted = true))
         }
-        require(messageId > 0) { "Failed to persist incoming SMS." }
-        val pendingMessage = duplicate?.copy(sourceSmsId = duplicate.sourceSmsId ?: sourceSmsId)
-            ?: newMessage
-
-        val matchedKeywords = keywordEngine.analyze(messageBody)
-        val isSavedContact = if (senderAddress != null &&
-            ContactNameResolver.isEnabled(applicationContext)
-        ) {
-            try {
-                ContactNameResolver.findName(applicationContext, senderAddress) != null
-            } catch (error: Exception) {
-                Log.w(TAG, "Contact lookup unavailable", error)
-                false
-            }
-        } else {
-            false
-        }
-        val riskScore = riskScorer.compute(matchedKeywords)
-        val hasStrongRuleSignal = MessageSignals.hasStrongRuleSignal(messageBody, matchedKeywords)
-        val ruleRiskLevel = thresholdEvaluator.evaluate(riskScore)
-        val indicators = matchedKeywords.map { it.pattern }.distinct()
-        val historyPoints = recentHistoryPoints(pendingMessage.copy(messageId = messageId))
-        val combined = CombinedRiskScorer.score(
-            ruleScore = riskScore,
-            hasStrongRuleSignal = hasStrongRuleSignal,
-            historyPoints = historyPoints,
-            senderPoints = SenderSignals.points(senderAddress, messageBody)
-        )
-        val initialRiskLevel = CombinedRiskScorer.withSuspiciousFloor(ruleRiskLevel, combined.total)
-
-        val ruleAnalyzed = pendingMessage.copy(
-            messageId = messageId,
-            riskScore = riskScore,
-            combinedRiskScore = combined.total,
-            ruleRiskPoints = combined.rulePoints,
-            aiRiskPoints = combined.aiPoints,
-            historyRiskPoints = combined.historyPoints,
-            senderRiskPoints = combined.senderPoints,
-            riskLevel = initialRiskLevel.name,
-            deterministicRiskLevel = ruleRiskLevel.name,
-            matchedIndicators = indicators.joinToString("\n"),
-            isSavedContact = isSavedContact,
-            hasStrongRuleSignal = hasStrongRuleSignal,
-            isFlagged = initialRiskLevel != RiskLevel.SAFE,
-            finalClassification = initialRiskLevel.name,
-            processingState = ProcessingState.RULE_ANALYZED.name
-        )
-        messageRepository.updateMessage(ruleAnalyzed)
-
-        val persistedMatches = matchedKeywords
-            .filter { it.keywordId > 0 }
-            .map { keyword ->
-                MessageKeyword(
-                    messageId = messageId,
-                    keywordId = keyword.keywordId,
-                    matchedText = keyword.pattern
-                )
-            }
-        if (persistedMatches.isNotEmpty()) {
-            database.messageKeywordDao().insertAllMessageKeywords(persistedMatches)
-        }
-
-        check(AiEligibilityPolicy.shouldQueue(ruleRiskLevel))
-        val queuedMessage = ruleAnalyzed.copy(processingState = ProcessingState.AI_QUEUED.name)
-        messageRepository.updateMessage(queuedMessage)
-        refreshOwnHistoryWarning(messageId)
-
-        if (pendingMessage.alertsEnabled && thresholdEvaluator.isHighRisk(riskScore)) {
-            showAlert(
-                message = queuedMessage,
-                riskLevel = ruleRiskLevel,
-                matchedKeywords = matchedKeywords,
-                rationale = "High-risk deterministic indicators were detected; AI analysis is pending."
-            )
-        } else if (pendingMessage.alertsEnabled && historyPoints == 25 && ruleRiskLevel == RiskLevel.SAFE) {
-            showAlert(
-                message = queuedMessage,
-                riskLevel = RiskLevel.SUSPICIOUS,
-                matchedKeywords = matchedKeywords,
-                rationale = "A recent message from this sender was confirmed as a scam."
-            )
-        }
-
-        Log.d(TAG, "Persisted deterministic result and queued on-device AI analysis.")
-        return IntakeResult(messageId, shouldEnqueueAi = true)
+        return IntakeResult(id, eligible)
     }
 
-    /** Runs one serialized Gemma attempt for a previously persisted message. */
-    suspend fun analyzeWithAi(messageId: Long, finalAttempt: Boolean = true): Boolean {
-        val message = messageRepository.getMessageById(messageId) ?: return true
-        if (message.processingState == ProcessingState.COMPLETED.name) return true
-
-        val ruleRiskLevel = runCatching {
-            RiskLevel.valueOf(message.deterministicRiskLevel)
-        }.getOrDefault(RiskLevel.SUSPICIOUS)
-
-        val analyzingMessage = message.copy(
-            gemmaInvoked = true,
-            aiAnalysisStatus = AiAnalysisStatus.ANALYZING.name,
-            processingState = ProcessingState.AI_ANALYZING.name
-        )
-        messageRepository.updateMessage(analyzingMessage)
-
-        val matchedIndicators = message.matchedIndicators
-            .lineSequence()
-            .filter { it.isNotBlank() }
-            .toList()
-        val history = messageRepository.getPreviousMessages(
-            historySenderHash(message),
-            message.receivedAt,
-            message.messageId,
-            ConversationRiskPolicy.CONTEXT_WINDOW_MILLIS,
-            ConversationRiskPolicy.MAX_CONTEXT_MESSAGES
-        ).asReversed().map { it.content }
-        val recentRiskMessage = messageRepository.getPreviousRiskMessage(
-            historySenderHash(message),
-            message.receivedAt,
-            message.messageId,
-            ConversationRiskPolicy.WARNING_WINDOW_MILLIS
-        )
-        val recentConfirmedScamText = recentRiskMessage?.takeIf {
-            ConversationRiskPolicy.historyPoints(listOf(it), message.receivedAt) == 25
-        }?.content
-
-        val gemmaResult = withTimeoutOrNull(Constants.GEMMA_TIMEOUT_MILLIS) {
-            GemmaManager.getReadyValidator(applicationContext).validate(
-                messageBody = message.content,
-                matchedKeywords = matchedIndicators,
-                conversationHistory = history,
-                recentConfirmedScamText = recentConfirmedScamText
-            )
-        } ?: GemmaResult.fallback("Gemma inference timed out.")
-
-        val finalVerdict = if (gemmaResult.isSuccessful || finalAttempt) {
-            FinalVerdictResolver.resolve(
-                ruleRiskLevel,
-                gemmaResult,
-                isSavedContact = message.isSavedContact,
-                hasStrongRuleSignal = message.hasStrongRuleSignal
-            )
-        } else {
-            FinalVerdictResolver.Verdict(ruleRiskLevel, ruleRiskLevel != RiskLevel.SAFE)
+    /** Applies only a completed authenticated server verdict from a future secure transport. */
+    suspend fun applyRemoteResult(messageId: Long, generation: Long, classification: String,
+                                  confidence: String, rationale: String): Boolean {
+        val remoteState = RemoteVerdictPolicy.stateFor(classification) ?: return false
+        val current = consent.snapshot()
+        val message = repository.getMessageById(messageId) ?: return false
+        if (!current.enabled || current.generation != generation || message.consentGeneration != generation ||
+            message.processingState !in setOf(ProcessingState.AI_QUEUED.name, ProcessingState.AI_ANALYZING.name)) return false
+        val shouldNotify = message.alertsEnabled && classification != "SAFE"
+        repository.updateMessage(message.copy(
+            notificationPosted = shouldNotify,
+            gemmaInvoked = true, gemmaClassification = classification,
+            gemmaConfidence = confidence, gemmaRationale = rationale,
+            aiAnalysisStatus = AiAnalysisStatus.AVAILABLE.name,
+            processingState = ProcessingState.COMPLETED.name,
+            detectionState = remoteState.name,
+            verdictSource = VerdictSource.REMOTE_GEMMA_RAG.name,
+            finalClassification = classification, riskLevel = classification,
+            isFlagged = classification != "SAFE"
+        ))
+        if (classification == "SAFE" && message.notificationPosted) {
+            NotificationHelper.cancelAlert(app, messageId)
+        } else if (shouldNotify) {
+            NotificationHelper.showScamAlert(app, DetectionResult(
+                messageContent = message.content, riskScore = message.riskScore,
+                riskLevel = RiskLevel.valueOf(classification), isFlagged = true,
+                matchedKeywords = emptyList(), gemmaInvoked = true,
+                finalClassification = classification, finalRationale = rationale
+            ), messageId)
         }
-        val processingState = when {
-            gemmaResult.isSuccessful -> ProcessingState.COMPLETED
-            finalAttempt -> ProcessingState.AI_FAILED
-            else -> ProcessingState.AI_QUEUED
-        }
-        val aiStatus = when {
-            gemmaResult.isSuccessful -> AiAnalysisStatus.AVAILABLE
-            finalAttempt -> AiAnalysisStatus.UNAVAILABLE
-            else -> AiAnalysisStatus.NOT_STARTED
-        }
-        val historyPoints = recentHistoryPoints(message)
-        val simpleGreeting = SimpleGreetingPolicy.isEligible(
-            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
-        )
-        val combined = CombinedRiskScorer.score(
-            ruleScore = message.riskScore,
-            hasStrongRuleSignal = message.hasStrongRuleSignal,
-            historyPoints = historyPoints,
-            senderPoints = message.senderRiskPoints,
-            gemmaResult = gemmaResult.takeUnless { simpleGreeting }
-        )
-        val finalRiskLevel = if (simpleGreeting) {
-            SimpleGreetingPolicy.verdict(historyPoints)
-        } else {
-            CombinedRiskScorer.withSuspiciousFloor(finalVerdict.riskLevel, combined.total)
-        }
-
-        val completedMessage = analyzingMessage.copy(
-            gemmaClassification = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.classification else null,
-            gemmaConfidence = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.confidence else null,
-            gemmaRationale = if (finalAttempt || gemmaResult.isSuccessful) gemmaResult.rationale else null,
-            aiAnalysisStatus = aiStatus.name,
-            processingState = processingState.name,
-            combinedRiskScore = combined.total,
-            ruleRiskPoints = combined.rulePoints,
-            aiRiskPoints = combined.aiPoints,
-            historyRiskPoints = combined.historyPoints,
-            senderRiskPoints = combined.senderPoints,
-            riskLevel = finalRiskLevel.name,
-            finalClassification = finalRiskLevel.name,
-            isFlagged = finalRiskLevel != RiskLevel.SAFE
-        )
-        messageRepository.updateMessage(completedMessage)
-        refreshOwnHistoryWarning(messageId)
-
-        if (gemmaResult.isSuccessful && gemmaResult.classification == Constants.GEMMA_SCAM &&
-            !simpleGreeting
-        ) {
-            refreshLaterWarnings(completedMessage)
-        }
-
-        if (message.alertsEnabled && gemmaResult.isSuccessful &&
-            (finalRiskLevel == RiskLevel.SCAM || ruleRiskLevel == RiskLevel.SCAM)
-        ) {
-            showAlert(
-                message = completedMessage,
-                riskLevel = finalRiskLevel,
-                matchedKeywords = emptyList(),
-                rationale = gemmaResult.rationale
-            )
-        }
-
-        Log.d(TAG, "Stored combined verdict with AI status ${aiStatus.name}.")
-        return gemmaResult.isSuccessful
-    }
-
-    /** Records an unexpected worker-level failure without weakening the rule result. */
-    suspend fun markAiUnavailable(messageId: Long) {
-        val message = messageRepository.getMessageById(messageId) ?: return
-        val ruleRiskLevel = runCatching {
-            RiskLevel.valueOf(message.deterministicRiskLevel)
-        }.getOrDefault(RiskLevel.SUSPICIOUS)
-        val fallback = GemmaResult.fallback()
-        val verdict = FinalVerdictResolver.resolve(ruleRiskLevel, fallback)
-        val historyPoints = recentHistoryPoints(message)
-        val simpleGreeting = SimpleGreetingPolicy.isEligible(
-            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
-        )
-        val combined = CombinedRiskScorer.score(
-            ruleScore = message.riskScore,
-            hasStrongRuleSignal = message.hasStrongRuleSignal,
-            historyPoints = historyPoints,
-            senderPoints = message.senderRiskPoints
-        )
-        val finalRiskLevel = if (simpleGreeting) {
-            SimpleGreetingPolicy.verdict(historyPoints)
-        } else {
-            CombinedRiskScorer.withSuspiciousFloor(verdict.riskLevel, combined.total)
-        }
-
-        messageRepository.updateMessage(
-            message.copy(
-                gemmaInvoked = true,
-                gemmaClassification = fallback.classification,
-                gemmaConfidence = fallback.confidence,
-                gemmaRationale = fallback.rationale,
-                aiAnalysisStatus = AiAnalysisStatus.UNAVAILABLE.name,
-                processingState = ProcessingState.AI_FAILED.name,
-                combinedRiskScore = combined.total,
-                ruleRiskPoints = combined.rulePoints,
-                aiRiskPoints = combined.aiPoints,
-                historyRiskPoints = combined.historyPoints,
-                senderRiskPoints = combined.senderPoints,
-                riskLevel = finalRiskLevel.name,
-                finalClassification = finalRiskLevel.name,
-                isFlagged = finalRiskLevel != RiskLevel.SAFE
-            )
-        )
-        refreshOwnHistoryWarning(messageId)
-    }
-
-    private fun historySenderHash(message: Message): String? =
-        message.senderHash.takeIf { message.senderAddress != null }
-
-    private suspend fun recentHistoryPoints(message: Message): Int {
-        val previous = messageRepository.getPreviousRiskMessage(
-            historySenderHash(message),
-            message.receivedAt,
-            message.messageId,
-            ConversationRiskPolicy.WARNING_WINDOW_MILLIS
-        )
-        return ConversationRiskPolicy.historyPoints(listOfNotNull(previous), message.receivedAt)
-    }
-
-    private suspend fun refreshOwnHistoryWarning(messageId: Long) {
-        val message = messageRepository.getMessageById(messageId) ?: return
-        val historyPoints = recentHistoryPoints(message)
-        if (historyPoints <= message.historyRiskPoints) return
-        val gemmaResult = if (message.aiAnalysisStatus == AiAnalysisStatus.AVAILABLE.name &&
-            message.gemmaClassification != null
-        ) {
-            GemmaResult(
-                message.gemmaClassification,
-                message.gemmaConfidence.orEmpty(),
-                message.gemmaRationale.orEmpty()
-            )
-        } else null
-        val simpleGreeting = SimpleGreetingPolicy.isEligible(
-            message.content, message.riskScore, message.hasStrongRuleSignal, message.senderRiskPoints
-        )
-        val combined = CombinedRiskScorer.score(
-            ruleScore = message.riskScore,
-            hasStrongRuleSignal = message.hasStrongRuleSignal,
-            historyPoints = historyPoints,
-            senderPoints = message.senderRiskPoints,
-            gemmaResult = gemmaResult?.takeUnless { simpleGreeting }
-        )
-        messageRepository.applyHistoryWarning(messageId, combined.total, combined.historyPoints)
-    }
-
-    /** A preceding AI result can finish after a newer SMS has already been saved. */
-    private suspend fun refreshLaterWarnings(source: Message) {
-        if (historySenderHash(source) == null) return
-        messageRepository.getLaterMessages(
-            source.senderHash,
-            source.receivedAt,
-            source.messageId,
-            ConversationRiskPolicy.WARNING_WINDOW_MILLIS
-        ).forEach { refreshOwnHistoryWarning(it.messageId) }
-    }
-
-    /** Allows a failed analysis to be retried without changing its rule verdict. */
-    suspend fun queueAiRetry(messageId: Long): Boolean {
-        val message = messageRepository.getMessageById(messageId) ?: return false
-        if (message.processingState != ProcessingState.AI_FAILED.name) return false
-
-        messageRepository.updateMessage(
-            message.copy(
-                gemmaInvoked = false,
-                gemmaClassification = null,
-                gemmaConfidence = null,
-                gemmaRationale = null,
-                aiAnalysisStatus = AiAnalysisStatus.NOT_STARTED.name,
-                processingState = ProcessingState.AI_QUEUED.name
-            )
-        )
         return true
     }
 
-    private fun showAlert(
-        message: Message,
-        riskLevel: RiskLevel,
-        matchedKeywords: List<Keyword>,
-        rationale: String
-    ) {
-        NotificationHelper.showScamAlert(
-            applicationContext,
-            DetectionResult(
-                messageContent = message.content,
-                riskScore = message.riskScore,
-                riskLevel = riskLevel,
-                isFlagged = true,
-                matchedKeywords = matchedKeywords,
-                gemmaInvoked = message.gemmaInvoked,
-                finalClassification = riskLevel.name,
-                finalRationale = rationale
-            ),
-            message.messageId
-        )
+    suspend fun markAiUnavailable(messageId: Long) {
+        val message = repository.getMessageById(messageId) ?: return
+        if (message.processingState == ProcessingState.COMPLETED.name) return
+        val fallback = RemoteVerdictPolicy.localFallback(message.deterministicRiskLevel)
+        repository.updateMessage(message.copy(
+            aiAnalysisStatus = AiAnalysisStatus.UNAVAILABLE.name,
+            processingState = ProcessingState.REMOTE_UNAVAILABLE.name,
+            detectionState = DetectionState.REMOTE_UNAVAILABLE.name,
+            verdictSource = VerdictSource.LOCAL_RULES.name,
+            finalClassification = fallback,
+            gemmaClassification = null, gemmaConfidence = null, gemmaRationale = null
+        ))
     }
+
+    suspend fun markConsentDisabled(messageId: Long) {
+        val message = repository.getMessageById(messageId) ?: return
+        if (message.processingState == ProcessingState.COMPLETED.name) return
+        repository.updateMessage(message.copy(
+            processingState = ProcessingState.REMOTE_CONSENT_DISABLED.name,
+            detectionState = DetectionState.REMOTE_CONSENT_DISABLED.name,
+            finalClassification = RemoteVerdictPolicy.localFallback(message.deterministicRiskLevel),
+            verdictSource = VerdictSource.LOCAL_RULES.name
+        ))
+    }
+
+    suspend fun queueAiRetry(@Suppress("UNUSED_PARAMETER") messageId: Long): Boolean = false
 }

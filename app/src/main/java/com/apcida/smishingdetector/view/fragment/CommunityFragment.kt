@@ -79,7 +79,7 @@ class CommunityFragment : Fragment() {
         val intro = panel()
         intro.addView(label("Your choice", 18f, true, R.color.inbox_text))
         intro.addView(label(
-            "You may contribute up to 20 scam and 20 safe SMS messages (40 total). ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation if they are still within that period. Scanning and Gemma analysis happen on your device. Nothing is shared during the scan. You will review, edit, remove, and confirm each proposed message before upload. Participation is optional.",
+            "You may contribute up to 20 scam and 20 safe SMS messages (40 total). ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation if they are still within that period. Only local keyword screening happens during the scan. Suggested labels are not verified; you must review and confirm them. Nothing is shared during the scan. You will review, edit, remove, and confirm each proposed message before upload. Participation is optional.",
             14f, false, R.color.inbox_muted), margin(0, 8))
         intro.addView(label("A contribution may share your edited SMS text, the model's predicted category, your reviewed category, a pseudonymous participant ID, and submission time. Sender numbers and contact names are never included. Researchers must verify labels independently.",
             13f, false, R.color.inbox_muted), margin(0, 10))
@@ -181,14 +181,14 @@ class CommunityFragment : Fragment() {
                     status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
                     return@launch
                 }
-                status.text = "Loading the on-device model…"
+                status.text = "Screening recent SMS with local keyword rules…"
                 val result = CommunityScanner(requireContext().applicationContext).scan(
                     CommunityPolicy.remaining(progress.scamAccepted),
                     CommunityPolicy.remaining(progress.safeAccepted), repository.acceptedIds()
                 ) { scanProgress ->
                     withContext(Dispatchers.Main) {
                         status.text = if (scanProgress.analyzing) {
-                            "Analyzing recent SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
+                            "Screening recent SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
                         } else {
                             "Checked ${scanProgress.examined} SMS from the last 30 days; analyzed ${scanProgress.analyzed}; found ${scanProgress.candidates} for review…"
                         }
@@ -218,7 +218,7 @@ class CommunityFragment : Fragment() {
             CommunityScanResult.StopReason.MESSAGE_LIMIT -> " Scan stopped after checking 1,000 messages."
             CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after analyzing 20 messages."
             CommunityScanResult.StopReason.MODEL_FAILURE ->
-                " On-device analysis failed three times in a row. Check that the Gemma model works on this phone."
+                " Screening stopped after repeated failures."
         }
         val resume = if (result.willResume) {
             " Start another scan to continue with older SMS from the last 30 days."
@@ -232,11 +232,11 @@ class CommunityFragment : Fragment() {
             val panel = panel(candidateContainer)
             val include = CheckBox(requireContext()).apply {
                 text = "Include this message"
-                isChecked = true
+                isChecked = candidate.predictedCategory == "SCAM"
                 setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
             }
             panel.addView(include)
-            panel.addView(label("Predicted: ${candidate.predictedCategory}", 13f, false, R.color.inbox_muted))
+            panel.addView(label("Local rule suggestion: ${candidate.predictedCategory} (review required)", 13f, false, R.color.inbox_muted))
             val categories = Spinner(requireContext())
             categories.adapter = object : ArrayAdapter<String>(requireContext(),
                 android.R.layout.simple_spinner_item, listOf("SCAM", "SAFE")) {
