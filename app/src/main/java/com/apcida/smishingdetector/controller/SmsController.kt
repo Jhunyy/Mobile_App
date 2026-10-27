@@ -90,26 +90,31 @@ class SmsController(context: Context) {
         return IntakeResult(id, eligible)
     }
 
+    /** Atomic claim before any future remote request; duplicate work cannot analyze twice. */
+    suspend fun claimRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        repository.claimRemoteAnalysis(messageId, generation)
+
+    suspend fun markClaimedAiUnavailable(messageId: Long, generation: Long): Boolean =
+        repository.failClaimedRemoteAnalysis(messageId, generation)
+
+    suspend fun markClaimedConsentDisabled(messageId: Long, generation: Long): Boolean =
+        repository.disableClaimedRemoteAnalysis(messageId, generation)
+
     /** Applies only a completed authenticated server verdict from a future secure transport. */
     suspend fun applyRemoteResult(messageId: Long, generation: Long, classification: String,
                                   confidence: String, rationale: String): Boolean {
         val remoteState = RemoteVerdictPolicy.stateFor(classification) ?: return false
+        if (confidence !in setOf("HIGH", "MEDIUM", "LOW") || rationale.isBlank() || rationale.length > 300) return false
         val current = consent.snapshot()
         val message = repository.getMessageById(messageId) ?: return false
         if (!current.enabled || current.generation != generation || message.consentGeneration != generation ||
-            message.processingState !in setOf(ProcessingState.AI_QUEUED.name, ProcessingState.AI_ANALYZING.name)) return false
+            message.processingState != ProcessingState.AI_ANALYZING.name) return false
         val shouldNotify = message.alertsEnabled && classification != "SAFE"
-        repository.updateMessage(message.copy(
-            notificationPosted = shouldNotify,
-            gemmaInvoked = true, gemmaClassification = classification,
-            gemmaConfidence = confidence, gemmaRationale = rationale,
-            aiAnalysisStatus = AiAnalysisStatus.AVAILABLE.name,
-            processingState = ProcessingState.COMPLETED.name,
-            detectionState = remoteState.name,
-            verdictSource = VerdictSource.REMOTE_GEMMA_RAG.name,
-            finalClassification = classification, riskLevel = classification,
-            isFlagged = classification != "SAFE"
-        ))
+        if (!repository.completeRemoteAnalysis(messageId, generation, classification,
+                confidence, rationale, remoteState.name)) return false
+        // Revocation can race with a finished request. Never post a new alert after revocation.
+        val after = consent.snapshot()
+        if (!after.enabled || after.generation != generation) return true
         if (classification == "SAFE" && message.notificationPosted) {
             NotificationHelper.cancelAlert(app, messageId)
         } else if (shouldNotify) {

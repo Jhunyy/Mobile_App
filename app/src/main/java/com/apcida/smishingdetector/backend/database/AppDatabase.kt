@@ -166,7 +166,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_7_8 = object : Migration(7, 8) {
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE messages ADD COLUMN detection_state TEXT NOT NULL DEFAULT 'LEGACY_ON_DEVICE'")
                 database.execSQL("ALTER TABLE messages ADD COLUMN verdict_source TEXT NOT NULL DEFAULT 'LEGACY_ON_DEVICE'")

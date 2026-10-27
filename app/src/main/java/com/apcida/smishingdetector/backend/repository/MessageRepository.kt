@@ -22,6 +22,20 @@ class MessageRepository(private val messageDao: MessageDao) {
         messageDao.updateMessage(message)
     }
 
+    suspend fun claimRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        messageDao.claimRemoteAnalysis(messageId, generation) == 1
+
+    suspend fun completeRemoteAnalysis(messageId: Long, generation: Long,
+        classification: String, confidence: String, rationale: String, detectionState: String): Boolean =
+        messageDao.completeRemoteAnalysis(messageId, generation, classification,
+            confidence, rationale, detectionState) == 1
+
+    suspend fun failClaimedRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        messageDao.failClaimedRemoteAnalysis(messageId, generation) == 1
+
+    suspend fun disableClaimedRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        messageDao.disableClaimedRemoteAnalysis(messageId, generation) == 1
+
     /**
      * Deletes a specific message.
      */

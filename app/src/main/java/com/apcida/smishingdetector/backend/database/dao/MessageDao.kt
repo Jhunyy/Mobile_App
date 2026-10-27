@@ -54,6 +54,52 @@ interface MessageDao {
     """)
     suspend fun markPendingRemoteConsentDisabled(currentGeneration: Long)
 
+    /** Atomic single-worker claim. A duplicate worker cannot issue another request. */
+    @Query("""
+        UPDATE messages SET processing_state = 'AI_ANALYZING'
+        WHERE message_id = :messageId AND processing_state = 'AI_QUEUED'
+          AND detection_state = 'REMOTE_PENDING' AND verdict_source = 'LOCAL_RULES'
+          AND consent_generation = :generation
+    """)
+    suspend fun claimRemoteAnalysis(messageId: Long, generation: Long): Int
+
+    /** Commit a verified response once; a stale or revoked work item cannot notify twice. */
+    @Query("""
+        UPDATE messages SET processing_state = 'COMPLETED',
+            detection_state = :detectionState, verdict_source = 'REMOTE_GEMMA_RAG',
+            ai_analysis_status = 'AVAILABLE', gemma_invoked = 1,
+            gemma_classification = :classification, gemma_confidence = :confidence,
+            gemma_rationale = :rationale, final_classification = :classification,
+            risk_level = :classification, is_flagged = CASE WHEN :classification = 'SAFE' THEN 0 ELSE 1 END,
+            notification_posted = CASE WHEN alerts_enabled = 1 AND :classification != 'SAFE' THEN 1 ELSE 0 END
+        WHERE message_id = :messageId AND processing_state = 'AI_ANALYZING'
+          AND verdict_source = 'LOCAL_RULES' AND consent_generation = :generation
+    """)
+    suspend fun completeRemoteAnalysis(messageId: Long, generation: Long,
+        classification: String, confidence: String, rationale: String, detectionState: String): Int
+
+    @Query("""
+        UPDATE messages SET processing_state = 'REMOTE_UNAVAILABLE',
+            detection_state = 'REMOTE_UNAVAILABLE', ai_analysis_status = 'UNAVAILABLE',
+            verdict_source = 'LOCAL_RULES',
+            final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END,
+            gemma_classification = NULL, gemma_confidence = NULL, gemma_rationale = NULL
+        WHERE message_id = :messageId AND processing_state = 'AI_ANALYZING'
+          AND verdict_source = 'LOCAL_RULES' AND consent_generation = :generation
+    """)
+    suspend fun failClaimedRemoteAnalysis(messageId: Long, generation: Long): Int
+
+    @Query("""
+        UPDATE messages SET processing_state = 'REMOTE_CONSENT_DISABLED',
+            detection_state = 'REMOTE_CONSENT_DISABLED', ai_analysis_status = 'NOT_STARTED',
+            verdict_source = 'LOCAL_RULES',
+            final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END,
+            gemma_classification = NULL, gemma_confidence = NULL, gemma_rationale = NULL
+        WHERE message_id = :messageId AND processing_state = 'AI_ANALYZING'
+          AND verdict_source = 'LOCAL_RULES' AND consent_generation = :generation
+    """)
+    suspend fun disableClaimedRemoteAnalysis(messageId: Long, generation: Long): Int
+
     @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before AND verdict_source = 'LOCAL_RULES' AND consent_generation > 0")
     suspend fun getStaleAiMessageIds(before: Long): List<Long>
 
