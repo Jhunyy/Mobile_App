@@ -40,9 +40,12 @@ class PilotManualActivity : AppCompatActivity() {
         layout.addView(label("Secure pilot · synthetic messages only"))
         layout.addView(label("Approved host: ${BuildConfig.PILOT_APPROVED_HOST.ifBlank { "Not configured" }}"))
         endpoint = EditText(this).apply {
-            hint = "https://your-pilot.tailnet.ts.net"
+            hint = "https://approved-pilot-host"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setSingleLine(true)
+            if (BuildConfig.PILOT_APPROVED_HOST.isNotBlank()) {
+                setText("https://${BuildConfig.PILOT_APPROVED_HOST}")
+            }
         }
         layout.addView(endpoint)
         credential = EditText(this).apply {

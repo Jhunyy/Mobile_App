@@ -59,7 +59,7 @@ class PilotSmsClient(
         } catch (_: InterruptedIOException) {
             PilotResult.Failure("Pilot request timed out.")
         } catch (_: IOException) {
-            PilotResult.Failure("Pilot server unavailable. Check Tailscale and the Mac.")
+            PilotResult.Failure("Pilot server unavailable. Check the secure tunnel and Mac.")
         } catch (_: Exception) {
             PilotResult.Failure("Could not read the pilot server response.")
         }

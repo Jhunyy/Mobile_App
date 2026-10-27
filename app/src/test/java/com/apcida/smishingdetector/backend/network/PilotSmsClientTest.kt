@@ -8,6 +8,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.IOException
+import java.time.OffsetDateTime
 
 class PilotSmsClientTest {
     private class MemoryCredential(var value: String? = "a".repeat(43)) : PilotCredentialSource {
@@ -66,5 +67,35 @@ class PilotSmsClientTest {
         assertTrue(bad.analyzeSynthetic("https://pilot.tailnet.ts.net", "pilot.tailnet.ts.net", "test") is PilotResult.Failure)
         val missing = client(MemoryCredential(null), Interceptor { chain -> response(chain, 200) })
         assertTrue(missing.analyzeSynthetic("https://pilot.tailnet.ts.net", "pilot.tailnet.ts.net", "test") is PilotResult.Failure)
+    }
+
+    @Test fun approvedCloudflareHostUsesFullAuthenticatedPilotContract() {
+        val host = "kick-olympics-sand-hostels.trycloudflare.com"
+        val store = MemoryCredential()
+        var calls = 0
+        val pilot = client(store, Interceptor { chain ->
+            calls++
+            val request = chain.request()
+            assertEquals("https", request.url.scheme)
+            assertEquals(host, request.url.host)
+            assertEquals("/api/sms/analyze", request.url.encodedPath)
+            assertEquals("Bearer ${store.value}", request.header("Authorization"))
+            assertEquals("true", request.header("x-apcida-pilot-synthetic"))
+            val raw = okio.Buffer().also { request.body!!.writeTo(it) }.readUtf8()
+            val json = com.google.gson.JsonParser().parse(raw).getAsJsonObject()
+            val id = json.get("messageId").getAsString()
+            assertTrue(Regex("pilot-[A-Za-z0-9_-]{8,80}").matches(id))
+            assertEquals("ManualTest", json.get("sender").getAsString())
+            assertEquals("Synthetic test only", json.get("text").getAsString())
+            OffsetDateTime.parse(json.get("receivedAt").getAsString())
+            response(chain, 200,
+                """{"messageId":"$id","classification":"SCAM","confidence":"HIGH","rationale":"Synthetic warning"}""")
+        })
+        assertTrue(pilot.analyzeSynthetic("https://$host", host, "Synthetic test only") is PilotResult.Success)
+        assertEquals(1, calls)
+        for (bad in listOf("http://$host", "https://other.trycloudflare.com", "https://$host.evil.test")) {
+            assertTrue(pilot.analyzeSynthetic(bad, host, "Synthetic test only") is PilotResult.Failure)
+        }
+        assertEquals(1, calls)
     }
 }
