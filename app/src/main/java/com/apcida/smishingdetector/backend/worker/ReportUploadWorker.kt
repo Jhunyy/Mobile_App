@@ -1,6 +1,7 @@
 package com.apcida.smishingdetector.backend.worker
 
 import android.content.Context
+import com.apcida.smishingdetector.BuildConfig
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -26,6 +27,8 @@ class ReportUploadWorker(
         private const val MAX_ATTEMPTS = 6
 
         fun enqueue(context: Context) {
+            // Local reports remain saved; this build has no approved outbound report credential.
+            if (BuildConfig.REPORT_API_KEY.isBlank()) return
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()

@@ -31,6 +31,7 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.adapter.MessageListAdapter
+import com.apcida.smishingdetector.view.presentation.DetectionPresentation
 import com.apcida.smishingdetector.view.widget.PullToRefreshLayout
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
@@ -278,8 +279,8 @@ class MessagesFragment : Fragment() {
             .filter { message ->
                 when (selectedFilter) {
                     InboxFilter.ALL -> true
-                    InboxFilter.SCAM -> message.riskLevel == Constants.RISK_SCAM
-                    InboxFilter.SAFE -> message.finalClassification == Constants.RISK_SAFE
+                    InboxFilter.SCAM -> DetectionPresentation.forMessage(message).verdict == Constants.RISK_SCAM
+                    InboxFilter.SAFE -> DetectionPresentation.forMessage(message).isSafeVerified
                     InboxFilter.UNREAD -> message.messageId.toString() !in readMessageIds
                 }
             }

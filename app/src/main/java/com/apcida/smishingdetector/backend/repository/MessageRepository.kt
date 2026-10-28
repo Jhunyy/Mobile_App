@@ -30,6 +30,15 @@ class MessageRepository(private val messageDao: MessageDao) {
         messageDao.completeRemoteAnalysis(messageId, generation, classification,
             confidence, rationale, detectionState) == 1
 
+    suspend fun getQueuedRemoteMessageIds(generation: Long, grantedAt: Long): List<Long> =
+        messageDao.getQueuedRemoteMessageIds(generation, grantedAt)
+
+    suspend fun failPendingRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        messageDao.failPendingRemoteAnalysis(messageId, generation) == 1
+
+    suspend fun disablePendingRemoteAnalysis(messageId: Long, generation: Long): Boolean =
+        messageDao.disablePendingRemoteAnalysis(messageId, generation) == 1
+
     suspend fun failClaimedRemoteAnalysis(messageId: Long, generation: Long): Boolean =
         messageDao.failClaimedRemoteAnalysis(messageId, generation) == 1
 

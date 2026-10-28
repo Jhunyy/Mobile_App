@@ -53,6 +53,36 @@ class RemoteAnalysisDaoInstrumentedTest {
         }
     }
 
+    @Test fun queuedRecoveryAndFallbackCannotOverwriteRemoteCompletion() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        try {
+            val dao = database.messageDao()
+            val queued = dao.insertMessage(Message(content = "Synthetic queued SMS", receivedAt = 2_000,
+                processingState = "AI_QUEUED", detectionState = "REMOTE_PENDING",
+                verdictSource = "LOCAL_RULES", consentGeneration = 2,
+                deterministicRiskLevel = "SAFE", finalClassification = "UNVERIFIED"))
+            assertEquals(listOf(queued), dao.getQueuedRemoteMessageIds(2, 1_000))
+            assertTrue(dao.getQueuedRemoteMessageIds(2, 3_000).isEmpty())
+            assertEquals(1, dao.failPendingRemoteAnalysis(queued, 2))
+            assertEquals("UNVERIFIED", dao.getMessageById(queued)?.finalClassification)
+            assertEquals(0, dao.claimRemoteAnalysis(queued, 2))
+            dao.markPendingRemoteConsentDisabled(3)
+            assertEquals("REMOTE_CONSENT_DISABLED", dao.getMessageById(queued)?.detectionState)
+            assertEquals("UNVERIFIED", dao.getMessageById(queued)?.finalClassification)
+
+            val completed = dao.insertMessage(Message(content = "Synthetic completed SMS", receivedAt = 2_000,
+                processingState = "AI_QUEUED", detectionState = "REMOTE_PENDING",
+                verdictSource = "LOCAL_RULES", consentGeneration = 2))
+            assertEquals(1, dao.claimRemoteAnalysis(completed, 2))
+            assertEquals(1, dao.completeRemoteAnalysis(completed, 2,
+                "SAFE", "HIGH", "Synthetic result", "REMOTE_SAFE"))
+            assertEquals(0, dao.failPendingRemoteAnalysis(completed, 2))
+            assertEquals(0, dao.disablePendingRemoteAnalysis(completed, 2))
+            assertEquals("SAFE", dao.getMessageById(completed)?.finalClassification)
+        } finally { database.close() }
+    }
+
     @Test fun failedZeroRuleAnalysisRemainsUnverified() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()

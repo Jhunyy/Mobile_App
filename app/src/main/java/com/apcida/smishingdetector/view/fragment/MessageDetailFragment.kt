@@ -15,21 +15,16 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.backend.database.AppDatabase
-import com.apcida.smishingdetector.backend.detection.SimpleGreetingPolicy
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.reporting.ReportSnapshotFactory
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
-import com.apcida.smishingdetector.backend.worker.SmsProcessingWorker
-import com.apcida.smishingdetector.controller.SmsController
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.databinding.FragmentMessageDetailBinding
 import com.apcida.smishingdetector.model.entity.Message
-import com.apcida.smishingdetector.model.data.AiAnalysisStatus
-import com.apcida.smishingdetector.model.data.ProcessingState
+import com.apcida.smishingdetector.view.presentation.DetectionPresentation
 import com.apcida.smishingdetector.util.ContactNameResolver
-import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.view.dialog.ReportFormDialog
 import com.apcida.smishingdetector.view.widget.PullToRefreshLayout
 import kotlinx.coroutines.CancellationException
@@ -50,7 +45,6 @@ class MessageDetailFragment : Fragment() {
     private lateinit var pullToRefresh: PullToRefreshLayout
 
     private var currentMessage: Message? = null
-    private var analysisDetailsExpanded = false
     private var senderName: String? = null
     private var senderLookupJob: Job? = null
     private var lastResolvedAddress: String? = null
@@ -193,16 +187,7 @@ class MessageDetailFragment : Fragment() {
     private fun displayMessage(message: Message) {
 
         binding.apply {
-            val analysisPending = message.processingState in setOf(
-                ProcessingState.PENDING.name,
-                ProcessingState.RULE_ANALYZED.name,
-                ProcessingState.AI_QUEUED.name,
-                ProcessingState.AI_ANALYZING.name
-            )
-            val simpleGreeting = SimpleGreetingPolicy.isEligible(
-                message.content, message.riskScore,
-                message.hasStrongRuleSignal, message.senderRiskPoints
-            )
+            val presentation = DetectionPresentation.forMessage(message)
 
             showSender(message)
             textReceivedAt.text = SimpleDateFormat(
@@ -219,16 +204,7 @@ class MessageDetailFragment : Fragment() {
             // Risk status
             // ---------------------------------
 
-            textRiskStatus.text = when {
-                analysisPending && message.processingState == ProcessingState.PENDING.name ->
-                    "ANALYZING"
-                message.finalClassification == Constants.RISK_SCAM ->
-                    if (message.verdictSource == "LOCAL_RULES") "SCAM · RULES ONLY" else "SCAM"
-                message.finalClassification == Constants.RISK_SUSPICIOUS ->
-                    if (message.verdictSource == "LOCAL_RULES") "SUSPICIOUS · RULES ONLY" else "SUSPICIOUS"
-                message.finalClassification == Constants.RISK_SAFE -> "SAFE"
-                else -> "UNVERIFIED"
-            }
+            textRiskStatus.text = presentation.badge
 
             if (message.combinedRiskScore == null) {
                 textRiskScore.text = "Rule risk score: ${message.riskScore.toInt()}"
@@ -251,16 +227,14 @@ class MessageDetailFragment : Fragment() {
             // Risk badge and sender avatar
             // ---------------------------------
 
-            val (statusColor, badgeColor) = when {
-                analysisPending && message.processingState == ProcessingState.PENDING.name ->
-                    Color.parseColor("#346783") to Color.parseColor("#E8F0F6")
-                message.finalClassification == Constants.RISK_SCAM ->
+            val (statusColor, badgeColor) = when (presentation.tone) {
+                DetectionPresentation.Tone.SCAM ->
                     Color.parseColor("#CA433C") to Color.parseColor("#FDECEC")
-                message.finalClassification == Constants.RISK_SUSPICIOUS ->
+                DetectionPresentation.Tone.SUSPICIOUS ->
                     Color.parseColor("#A86508") to Color.parseColor("#FFF1D8")
-                message.finalClassification == "UNVERIFIED" ->
+                DetectionPresentation.Tone.UNVERIFIED ->
                     Color.parseColor("#346783") to Color.parseColor("#E8F0F6")
-                else ->
+                DetectionPresentation.Tone.SAFE ->
                     Color.parseColor("#218957") to Color.parseColor("#E5F4E9")
             }
 
@@ -276,133 +250,19 @@ class MessageDetailFragment : Fragment() {
             // ---------------------------------
 
             textRecentSenderHistory.visibility =
-                if (message.historyRiskPoints == 25 && !simpleGreeting) View.VISIBLE else View.GONE
-
-            if (message.verdictSource == "LOCAL_RULES") {
-                btnRetryAi.visibility = View.GONE
-                cardGemmaAnalysis.visibility = View.VISIBLE
-                btnToggleAnalysisDetails.visibility = View.GONE
-                layoutAnalysisDetails.visibility = View.GONE
-                textGemmaRationale.text = when (message.detectionState) {
-                    "REMOTE_UNAVAILABLE" -> "Remote Gemma 3 12B + RAG analysis is unavailable. This is a keyword-only result, not AI verified."
-                    "REMOTE_PENDING" -> "Remote AI analysis is pending. Local keyword warnings are preliminary."
-                    else -> "AI Protection is off. Local keywords are the only current check; no final SAFE verdict is available."
-                }
-            } else if (analysisPending) {
-                btnRetryAi.visibility = View.GONE
-                cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = "Remote AI analysis is pending…"
-                btnToggleAnalysisDetails.visibility = View.GONE
-                layoutAnalysisDetails.visibility = View.GONE
-            } else if (message.aiAnalysisStatus == AiAnalysisStatus.UNAVAILABLE.name) {
-                btnRetryAi.visibility = View.VISIBLE
-                btnRetryAi.setOnClickListener {
-                    btnRetryAi.isEnabled = false
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        val context = requireContext().applicationContext
-                        if (SmsController(context).queueAiRetry(message.messageId)) {
-                            SmsProcessingWorker.enqueue(context, message.messageId)
-                        } else {
-                            btnRetryAi.isEnabled = true
-                        }
-                    }
-                }
-                btnRetryAi.isEnabled = true
-                cardGemmaAnalysis.visibility = View.VISIBLE
-                textGemmaRationale.text = when {
-                    simpleGreeting && message.historyRiskPoints == 25 ->
-                        "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious. AI analysis is unavailable."
-                    simpleGreeting ->
-                        "This is a simple greeting with no scam request or link. AI analysis is unavailable."
-                    else -> message.gemmaRationale
-                        ?: "AI analysis is unavailable; the rule result was preserved."
-                }
-                btnToggleAnalysisDetails.visibility = View.GONE
-                layoutAnalysisDetails.visibility = View.GONE
-            } else if (message.verdictSource == "REMOTE_GEMMA_RAG") {
-                btnRetryAi.visibility = View.GONE
-                cardGemmaAnalysis.visibility = View.VISIBLE
-                btnToggleAnalysisDetails.visibility = View.GONE
-                layoutAnalysisDetails.visibility = View.GONE
-                textGemmaRationale.text = "Remote Gemma 3 12B + RAG: ${message.gemmaRationale ?: "No rationale returned."}"
-                textGemmaClassification.text = "Remote AI result: ${message.gemmaClassification ?: "Unavailable"}"
-                textGemmaConfidence.text = "Model confidence: ${message.gemmaConfidence ?: "N/A"} (self-reported)"
-                textGemmaRawReason.text = message.gemmaRationale ?: ""
-            } else if (message.gemmaInvoked) {
-                btnRetryAi.visibility = View.GONE
-
-                // Gemma was attempted, so show the card
-                cardGemmaAnalysis.visibility = View.VISIBLE
-                btnToggleAnalysisDetails.visibility = View.VISIBLE
-                layoutAnalysisDetails.visibility =
-                    if (analysisDetailsExpanded) View.VISIBLE else View.GONE
-                btnToggleAnalysisDetails.text =
-                    if (analysisDetailsExpanded) "Hide analysis details" else "Show analysis details"
-                btnToggleAnalysisDetails.setOnClickListener {
-                    analysisDetailsExpanded = !analysisDetailsExpanded
-                    layoutAnalysisDetails.visibility =
-                        if (analysisDetailsExpanded) View.VISIBLE else View.GONE
-                    btnToggleAnalysisDetails.text =
-                        if (analysisDetailsExpanded) "Hide analysis details" else "Show analysis details"
-                }
-                val aiResult = message.gemmaClassification ?: "Unavailable"
-                val excluded = simpleGreeting && aiResult == Constants.GEMMA_SCAM
-                textGemmaClassification.text = if (excluded) {
-                    "AI result: SCAM (excluded from final verdict)"
-                } else {
-                    "AI result: $aiResult"
-                }
-                textGemmaConfidence.text =
-                    "Model confidence: ${message.gemmaConfidence ?: "N/A"} (self-reported, not a probability)"
-                textGemmaRawReason.text =
-                    "AI reason: ${message.gemmaRationale ?: "No explanation available."}"
-
-                if (message.gemmaClassification != Constants.GEMMA_UNCERTAIN &&
-                    !message.gemmaRationale.isNullOrEmpty()) {
-
-                    // The main explanation describes the final verdict.
-                    textGemmaRationale.text = when {
-                        simpleGreeting && message.historyRiskPoints == 25 ->
-                            "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious."
-                        simpleGreeting ->
-                            "This is a simple greeting with no scam request or link. No risk signals were found in this SMS."
-                        message.gemmaClassification == Constants.GEMMA_SCAM &&
-                            message.finalClassification != Constants.RISK_SCAM ->
-                            "This message needs review, but the available evidence did not justify a scam verdict."
-                        message.finalClassification == Constants.RISK_SUSPICIOUS &&
-                            message.gemmaClassification == Constants.GEMMA_LEGITIMATE ->
-                            if (message.historyRiskPoints == 25) {
-                                "Gemma found no clear scam request in this SMS alone. The recent confirmed scam from this sender keeps this follow-up suspicious."
-                            } else if (message.historyRiskPoints > 0) {
-                                "Recent messages from this sender keep this SMS under review. ${message.gemmaRationale}"
-                            } else {
-                                "Message indicators remain; verify independently. ${message.gemmaRationale}"
-                            }
-                        else -> message.gemmaRationale
-                    }
-
-                } else {
-
-                    // Gemma was invoked but inference was unavailable
-                    textGemmaRationale.text = when {
-                        simpleGreeting && message.historyRiskPoints == 25 ->
-                            "This greeting has no scam request or link. A message from this sender was classified as a scam in the previous 24 hours, so this SMS is suspicious."
-                        simpleGreeting ->
-                            "This is a simple greeting with no scam request or link."
-                        message.gemmaConfidence == null ->
-                            "Contextual analysis was unavailable. Classification based on keyword scoring only."
-                        else -> message.gemmaRationale ?: "Contextual analysis was inconclusive."
-                    }
-                }
-
-            } else {
-                btnRetryAi.visibility = View.GONE
-
-                // Gemma was never invoked for this message
-                cardGemmaAnalysis.visibility = View.GONE
-                btnToggleAnalysisDetails.visibility = View.GONE
-                layoutAnalysisDetails.visibility = View.GONE
-            }
+                if (message.historyRiskPoints == 25) View.VISIBLE else View.GONE
+            cardGemmaAnalysis.visibility = View.VISIBLE
+            btnRetryAi.visibility = View.GONE
+            btnToggleAnalysisDetails.visibility = View.GONE
+            layoutAnalysisDetails.visibility = if (presentation.aiVerified) View.VISIBLE else View.GONE
+            val olderExplanation = if (message.verdictSource == "LEGACY_ON_DEVICE" &&
+                !message.gemmaRationale.isNullOrBlank()) {
+                " Earlier app reason: ${message.gemmaRationale}"
+            } else ""
+            textGemmaRationale.text = presentation.explanation + olderExplanation
+            textGemmaClassification.text = "Remote AI result: ${presentation.verdict}"
+            textGemmaConfidence.text = "Model confidence: ${presentation.confidence ?: "N/A"} (self-reported)"
+            textGemmaRawReason.visibility = View.GONE
 
             // ---------------------------------
             // Report button
@@ -518,7 +378,7 @@ class MessageDetailFragment : Fragment() {
 
             Toast.makeText(
                 requireContext(),
-                "Report saved. Upload will run when the server is available.",
+                "Report saved on this device. Sharing is unavailable in this build.",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -557,7 +417,6 @@ class MessageDetailFragment : Fragment() {
 
     override fun onDestroyView() {
         senderLookupJob?.cancel()
-        analysisDetailsExpanded = false
         super.onDestroyView()
 
         _binding = null

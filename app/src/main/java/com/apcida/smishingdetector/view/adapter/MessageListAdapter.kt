@@ -10,8 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ItemMessageBinding
 import com.apcida.smishingdetector.model.entity.Message
-import com.apcida.smishingdetector.model.data.ProcessingState
-import com.apcida.smishingdetector.util.Constants
+import com.apcida.smishingdetector.view.presentation.DetectionPresentation
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,15 +49,7 @@ class MessageListAdapter(
             binding.apply {
                 val context = root.context
                 val unread = isUnread(message)
-                val pending = message.processingState in setOf(
-                    ProcessingState.PENDING.name,
-                    ProcessingState.RULE_ANALYZED.name,
-                    ProcessingState.AI_QUEUED.name,
-                    ProcessingState.AI_ANALYZING.name
-                )
-                val rulesPending = message.processingState == ProcessingState.PENDING.name
-                val unverified = message.finalClassification == "UNVERIFIED"
-                val localOnly = message.verdictSource == "LOCAL_RULES"
+                val presentation = DetectionPresentation.forMessage(message)
 
                 textSender.text = message.senderAddress?.let { contactNames[it] ?: it }
                     ?: context.getString(R.string.unknown_sender)
@@ -69,14 +60,13 @@ class MessageListAdapter(
                 // Time
                 textTime.text = formatTime(message.receivedAt)
 
-                val indicatorColor = when {
-                    rulesPending || unverified -> ContextCompat.getColor(context, R.color.inbox_pending)
-                    message.finalClassification == Constants.RISK_SCAM ->
-                        ContextCompat.getColor(context, R.color.inbox_scam)
-                    message.finalClassification == Constants.RISK_SUSPICIOUS ->
-                        ContextCompat.getColor(context, R.color.inbox_suspicious)
-                    else -> ContextCompat.getColor(context, R.color.inbox_safe)
+                val indicatorColor = when (presentation.tone) {
+                    DetectionPresentation.Tone.SCAM -> ContextCompat.getColor(context, R.color.inbox_scam)
+                    DetectionPresentation.Tone.SUSPICIOUS -> ContextCompat.getColor(context, R.color.inbox_suspicious)
+                    DetectionPresentation.Tone.UNVERIFIED -> ContextCompat.getColor(context, R.color.inbox_pending)
+                    DetectionPresentation.Tone.SAFE -> ContextCompat.getColor(context, R.color.inbox_safe)
                 }
+
                 avatarCircle.setCardBackgroundColor(indicatorColor)
                 unreadDot.visibility = if (unread) View.VISIBLE else View.GONE
                 cardMessage.setCardBackgroundColor(ContextCompat.getColor(
@@ -87,19 +77,14 @@ class MessageListAdapter(
                 )
 
                 textRiskBadge.visibility = View.VISIBLE
-                textRiskBadge.text = when {
-                    rulesPending -> "ANALYZING"
-                    unverified -> "UNVERIFIED · ${if (message.detectionState == "REMOTE_UNAVAILABLE") "AI UNAVAILABLE" else "RULES ONLY"}"
-                    pending -> "${message.finalClassification} · AI PENDING"
-                    localOnly -> "${message.finalClassification} · RULES ONLY"
-                    else -> "${message.finalClassification} · REMOTE AI"
+                textRiskBadge.text = presentation.badge
+                val badgeBackground = when (presentation.tone) {
+                    DetectionPresentation.Tone.SCAM -> R.drawable.bg_inbox_badge_scam
+                    DetectionPresentation.Tone.SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
+                    DetectionPresentation.Tone.UNVERIFIED -> R.drawable.bg_inbox_badge_pending
+                    DetectionPresentation.Tone.SAFE -> R.drawable.bg_inbox_badge_safe
                 }
-                val badgeBackground = when {
-                    rulesPending || unverified -> R.drawable.bg_inbox_badge_pending
-                    message.finalClassification == Constants.RISK_SCAM -> R.drawable.bg_inbox_badge_scam
-                    message.finalClassification == Constants.RISK_SUSPICIOUS -> R.drawable.bg_inbox_badge_suspicious
-                    else -> R.drawable.bg_inbox_badge_safe
-                }
+
                 textRiskBadge.setBackgroundResource(badgeBackground)
                 textRiskBadge.setTextColor(indicatorColor)
 

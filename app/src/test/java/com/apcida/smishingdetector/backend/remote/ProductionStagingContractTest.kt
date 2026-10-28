@@ -82,13 +82,16 @@ class ProductionStagingContractTest {
         }
     }
 
-    @Test fun invalidAndRevokedInstallationCredentialsAreCleared() = runBlocking {
+    @Test fun invalidAndRevokedInstallationCredentialsAreQuarantined() = runBlocking {
         for (token in listOf("z".repeat(43), revokedToken)) {
             val credentials = MemoryCredential(token)
             assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
                 transport(credentials).analyze(candidate("SCAM")))
             assertEquals(1, credentials.quarantines)
             assertNull(credentials.get())
+            assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
+                transport(credentials).analyze(candidate("SCAM")))
+            assertEquals(1, credentials.quarantines)
         }
     }
 
@@ -111,7 +114,11 @@ class ProductionStagingContractTest {
                 chain.proceed(chain.request().newBuilder().url(replacement).build())
             }).build()
         val client = ProductionRevocationClient(http)
+        assertEquals(ProductionRevocationClient.Result.AUTH_REJECTED,
+            client.revoke(approvedOrigin, "staging.apcida.invalid", revokedToken))
         assertEquals(ProductionRevocationClient.Result.CONFIRMED,
+            client.revoke(approvedOrigin, "staging.apcida.invalid", androidRevokeToken))
+        assertEquals(ProductionRevocationClient.Result.AUTH_REJECTED,
             client.revoke(approvedOrigin, "staging.apcida.invalid", androidRevokeToken))
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
             transport(MemoryCredential(androidRevokeToken)).analyze(candidate("SCAM")))

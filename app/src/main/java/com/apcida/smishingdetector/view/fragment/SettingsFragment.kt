@@ -24,6 +24,11 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.R
+import com.apcida.smishingdetector.BuildConfig
+import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
+import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
+import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.view.presentation.ProtectionStatusPresentation
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.PermissionHelper
@@ -37,6 +42,9 @@ import kotlinx.coroutines.launch
 class SettingsFragment : Fragment() {
     private lateinit var aiSwitch: SwitchCompat
     private lateinit var deletionStatus: TextView
+    private lateinit var serviceStatus: TextView
+    private lateinit var localStatus: TextView
+    private lateinit var credentialStatus: TextView
     private lateinit var smsSwitch: SwitchCompat
     private lateinit var notificationSwitch: SwitchCompat
     private lateinit var namesSwitch: SwitchCompat
@@ -113,9 +121,18 @@ class SettingsFragment : Fragment() {
                     .show()
             }
         }
-        protection.addView(label("Current service status: remote automatic analysis unavailable; keyword-only protection active.", 13f, false, R.color.inbox_muted).apply {
+        serviceStatus = label("", 13f, false, R.color.inbox_muted).apply {
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+        protection.addView(serviceStatus)
+        localStatus = label("", 13f, false, R.color.inbox_muted).apply {
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+        protection.addView(localStatus)
+        credentialStatus = label("", 13f, false, R.color.inbox_muted).apply {
             setPadding(dp(12), dp(4), dp(12), dp(12))
-        })
+        }
+        protection.addView(credentialStatus)
         deletionStatus = label("", 13f, false, R.color.inbox_muted).apply {
             setPadding(dp(12), dp(4), dp(12), dp(12))
             setOnClickListener {
@@ -160,7 +177,7 @@ class SettingsFragment : Fragment() {
         linkRow(community, R.drawable.ic_groups, "Help the Community", "Contribute up to 20 scam and 20 safe messages to improve detection") {
             findNavController().navigate(R.id.communityFragment)
         }
-        community.addView(label("ⓘ   Selected messages will be reviewed before sharing.", 13f, false, R.color.inbox_safe).apply {
+        community.addView(label("ⓘ   Research sharing is separate from AI Protection. You review and confirm each upload.", 13f, false, R.color.inbox_safe).apply {
             background = rounded(0xFFE8F8F0.toInt(), 0, 12)
             setPadding(dp(12), dp(9), dp(12), dp(9))
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -182,7 +199,18 @@ class SettingsFragment : Fragment() {
     private fun refreshSwitches() {
         val context = requireContext()
         val protectionStore = AiProtectionConsentStore(context)
-        aiSwitch.isChecked = protectionStore.snapshot().enabled
+        val consent = protectionStore.snapshot()
+        aiSwitch.isChecked = consent.enabled
+        val host = BuildConfig.PRODUCTION_APPROVED_HOST
+        val approvedHost = ProductionEndpointPolicy.isApprovedHttpsOrigin("https://$host", host) &&
+            !host.endsWith(".trycloudflare.com", ignoreCase = true)
+        serviceStatus.text = ProtectionStatusPresentation.remote(
+            consent.enabled, RemoteTransportGate.PRODUCTION_READY, approvedHost)
+        localStatus.text = ProtectionStatusPresentation.local(PermissionHelper.hasSmsPermissions(context))
+        val credential = ProductionCredentialStore(context)
+        credentialStatus.text = ProtectionStatusPresentation.credential(
+            credential.hasStoredCredential(), credential.isQuarantinedForInference(),
+            protectionStore.remoteDeletionPending())
         if (::deletionStatus.isInitialized) {
             val status = protectionStore.remoteDeletionStatus()
             deletionStatus.text = when (status) {

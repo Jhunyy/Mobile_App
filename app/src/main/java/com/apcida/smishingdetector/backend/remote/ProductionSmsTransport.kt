@@ -4,6 +4,7 @@ import com.apcida.smishingdetector.backend.consent.AutomaticAnalysisPolicy
 import com.apcida.smishingdetector.backend.network.ProductionCredentialSource
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.ProductionTiming
+import com.apcida.smishingdetector.backend.network.executeCancellable
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -62,7 +63,7 @@ internal class ProductionSmsTransport(
             .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         try {
-            http.newCall(request).execute().use { response ->
+            http.executeCancellable(request) { response ->
                 when (response.code) {
                     401, 403 -> {
                         credentials.quarantine()

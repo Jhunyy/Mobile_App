@@ -10,6 +10,22 @@ import java.util.UUID
 /** Isolated preference file; no production endpoint, credential or SMS is accessed. */
 @RunWith(AndroidJUnit4::class)
 class ProductionConsentRevocationInstrumentedTest {
+    @Test fun localOptOutStillCommitsWhenCredentialLookupFails() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val preferenceName = "production_revocation_error_test_" + UUID.randomUUID()
+        try {
+            val store = AiProtectionConsentStore(context, preferenceName,
+                hasProductionCredential = { throw IllegalStateException("synthetic lookup failure") },
+                enqueueDeletion = {})
+            store.grant(1000)
+            store.revoke()
+            assertFalse(store.snapshot().enabled)
+            assertTrue(store.remoteDeletionPending())
+        } finally {
+            context.getSharedPreferences(preferenceName, 0).edit().clear().commit()
+        }
+    }
+
     @Test fun localOptOutAndDeletionMarkerPersistAcrossStoreRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val preferenceName = "production_revocation_test_" + UUID.randomUUID()

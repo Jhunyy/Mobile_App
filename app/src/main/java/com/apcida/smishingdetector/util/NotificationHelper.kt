@@ -14,8 +14,8 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavDeepLinkBuilder
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.model.data.DetectionResult
-import com.apcida.smishingdetector.model.data.RiskLevel
 import com.apcida.smishingdetector.view.activity.MainActivity
+import com.apcida.smishingdetector.view.presentation.NotificationCopy
 
 object NotificationHelper {
 
@@ -46,27 +46,13 @@ object NotificationHelper {
             })
             .createPendingIntent()
 
-        val isRuleOnlyWarning = !result.gemmaInvoked
-        val title = when {
-            isRuleOnlyWarning -> "High-risk SMS detected"
-            result.riskLevel == RiskLevel.SUSPICIOUS -> "Suspicious SMS requires review"
-            else -> "Potential scam SMS detected"
-        }
-        val explanation = when {
-            isRuleOnlyWarning ->
-                "Local rules found strong scam indicators. Remote AI has not verified this message."
-            result.riskLevel == RiskLevel.SUSPICIOUS ->
-                "Remote AI marked this message suspicious. Review it before taking action."
-            else ->
-                "Remote AI marked this message as a potential scam. Review the result before taking action."
-        }
         val notification = NotificationCompat.Builder(context, SCAM_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_warning)
-            .setContentTitle(title)
-            .setContentText("Risk score: ${result.riskScore.toInt()}. Tap to review details.")
+            .setContentTitle(NotificationCopy.title(result))
+            .setContentText(NotificationCopy.summary(result))
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(explanation)
+                    .bigText(NotificationCopy.explanation(result))
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -105,7 +91,7 @@ object NotificationHelper {
             SCAM_ALERT_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Alerts when KA-SDS detects a likely scam SMS."
+            description = "ApCiDa local keyword and remote AI scam warnings."
         }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)

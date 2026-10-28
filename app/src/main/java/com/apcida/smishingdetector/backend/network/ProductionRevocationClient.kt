@@ -29,7 +29,7 @@ internal class ProductionRevocationClient(
             val request = Request.Builder().url(origin.trimEnd('/') + "/api/v1/installations/me")
                 .header("Authorization", "Bearer $token").delete().build()
             try {
-                http.newCall(request).execute().use { response ->
+                http.executeCancellable(request) { response ->
                     when (response.code) {
                         204 -> Result.CONFIRMED
                         401, 403 -> Result.AUTH_REJECTED
@@ -40,8 +40,8 @@ internal class ProductionRevocationClient(
             } catch (_: IOException) {
                 Result.RETRYABLE_FAILURE
             } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
+                throw cancelled
+            } catch (_: Exception) {
                 Result.RETRYABLE_FAILURE
             }
         }

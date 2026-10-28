@@ -8,6 +8,9 @@ import com.apcida.smishingdetector.controller.SmsController
 import com.apcida.smishingdetector.model.data.AiAnalysisStatus
 import com.apcida.smishingdetector.model.data.ProcessingState
 import com.apcida.smishingdetector.model.entity.Message
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +59,46 @@ class OfflineKeywordSmsTest {
                     dao.deleteMessage(row)
                 }
             }
+        }
+    }
+
+    @Test fun duplicateBroadcastsStoreOneSyntheticMessage() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dao = AppDatabase.getInstance(context).messageDao()
+        val sender = "DuplicateRules-${UUID.randomUUID()}"
+        val body = "Synthetic dinner reminder"
+        val receivedAt = System.currentTimeMillis()
+        var id = 0L
+        try {
+            val results = (1..8).map { async(Dispatchers.IO) {
+                SmsController(context).receiveAndAnalyzeRules(sender, body, receivedAt,
+                    alertOnDetection = false)
+            } }.awaitAll()
+            id = results.first().messageId
+            assertTrue(id > 0)
+            assertEquals(1, results.map { it.messageId }.distinct().size)
+            assertTrue(results.none { it.shouldEnqueueAi })
+            assertEquals("UNVERIFIED", dao.getMessageById(id)?.finalClassification)
+        } finally {
+            if (id > 0) dao.getMessageById(id)?.let { dao.deleteMessage(it) }
+        }
+    }
+
+    @Test fun historicalSyntheticImportNeverQueuesRemoteAnalysis() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dao = AppDatabase.getInstance(context).messageDao()
+        val sender = "HistoricalRules-${UUID.randomUUID()}"
+        var id = 0L
+        try {
+            val result = SmsController(context).receiveAndAnalyzeRules(sender,
+                "Synthetic old family reminder", System.currentTimeMillis() - 86_400_000L,
+                alertOnDetection = false, historicalImport = true)
+            id = result.messageId
+            assertFalse(result.shouldEnqueueAi)
+            assertEquals("UNVERIFIED", dao.getMessageById(id)?.finalClassification)
+            assertFalse(dao.getMessageById(id)?.processingState == ProcessingState.AI_QUEUED.name)
+        } finally {
+            if (id > 0) dao.getMessageById(id)?.let { dao.deleteMessage(it) }
         }
     }
 

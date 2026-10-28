@@ -17,12 +17,8 @@ fun buildConfigString(value: String): String =
 val reportBaseUrl = System.getenv("APCIDA_REPORT_BASE_URL")
     ?: localProperties.getProperty("apcida.reportBaseUrl")
     ?: "https://apcida-server.onrender.com/api/"
-val reportApiKey = System.getenv("APCIDA_REPORT_API_KEY")
-    ?: localProperties.getProperty("apcida.reportApiKey")
-    ?: ""
-val communityApiKey = System.getenv("APCIDA_COMMUNITY_API_KEY")
-    ?: localProperties.getProperty("apcida.communityApiKey")
-    ?: ""
+// No shared report or research API secret is embedded in the pre-meetup APK.
+// Re-enable these paths only with a separately reviewed credential design.
 // A public DNS identity, never a credential. Configured only for local debug pilot builds.
 val pilotApprovedHost = localProperties.getProperty("apcida.pilotApprovedHost") ?: ""
 // Empty until a separately approved stable HTTPS identity is provisioned. This is not a secret.
@@ -40,8 +36,8 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "REPORT_BASE_URL", buildConfigString(reportBaseUrl))
-        buildConfigField("String", "REPORT_API_KEY", buildConfigString(reportApiKey))
-        buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(communityApiKey))
+        buildConfigField("String", "REPORT_API_KEY", buildConfigString(""))
+        buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(""))
         buildConfigField("String", "PRODUCTION_APPROVED_HOST", buildConfigString(productionApprovedHost))
     }
 

@@ -49,10 +49,35 @@ interface MessageDao {
         UPDATE messages SET processing_state = 'REMOTE_CONSENT_DISABLED',
             detection_state = 'REMOTE_CONSENT_DISABLED',
             final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END
-        WHERE verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING')
+        WHERE verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING', 'REMOTE_UNAVAILABLE')
           AND consent_generation < :currentGeneration
     """)
     suspend fun markPendingRemoteConsentDisabled(currentGeneration: Long)
+
+    /** Pending work found after process restart; no SMS text enters WorkManager input. */
+    @Query("SELECT message_id FROM messages WHERE processing_state = 'AI_QUEUED' AND detection_state = 'REMOTE_PENDING' AND verdict_source = 'LOCAL_RULES' AND consent_generation = :generation AND received_at >= :grantedAt")
+    suspend fun getQueuedRemoteMessageIds(generation: Long, grantedAt: Long): List<Long>
+
+    /** Fail only a still-pending row; never overwrite a completed remote verdict. */
+    @Query("""
+        UPDATE messages SET processing_state = 'REMOTE_UNAVAILABLE',
+            detection_state = 'REMOTE_UNAVAILABLE', ai_analysis_status = 'UNAVAILABLE',
+            final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END,
+            gemma_classification = NULL, gemma_confidence = NULL, gemma_rationale = NULL
+        WHERE message_id = :messageId AND consent_generation = :generation
+          AND verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING')
+    """)
+    suspend fun failPendingRemoteAnalysis(messageId: Long, generation: Long): Int
+
+    @Query("""
+        UPDATE messages SET processing_state = 'REMOTE_CONSENT_DISABLED',
+            detection_state = 'REMOTE_CONSENT_DISABLED', ai_analysis_status = 'NOT_STARTED',
+            final_classification = CASE WHEN deterministic_risk_level = 'SAFE' THEN 'UNVERIFIED' ELSE deterministic_risk_level END,
+            gemma_classification = NULL, gemma_confidence = NULL, gemma_rationale = NULL
+        WHERE message_id = :messageId AND consent_generation = :generation
+          AND verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING')
+    """)
+    suspend fun disablePendingRemoteAnalysis(messageId: Long, generation: Long): Int
 
     /** Atomic single-worker claim. A duplicate worker cannot issue another request. */
     @Query("""

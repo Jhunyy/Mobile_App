@@ -62,7 +62,7 @@ class AiProtectionConsentStore(
 
     @Synchronized fun revoke() {
         val generation = prefs.getLong("generation", 0) + 1
-        val pending = remoteDeletionPending() || hasProductionCredential()
+        val pending = remoteDeletionPending() || runCatching { hasProductionCredential() }.getOrDefault(true)
         // Local opt-out and the deletion marker share one durable commit.
         check(prefs.edit().putBoolean("enabled", false).putLong("granted_at", 0)
             .putLong("generation", generation).putBoolean("remote_deletion_pending", pending)

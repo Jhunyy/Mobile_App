@@ -199,7 +199,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:fontFamily="@font/dm_sans_regular"
-                    android:text="When enabled, each newly received SMS is sent automatically for remote analysis. Already sent requests cannot be recalled. The service is not yet securely configured, so automatic sending remains disabled while you can use local keyword warnings."
+                    android:text="With your separate consent, each new SMS text, sender, receipt time and request ID will be sent to remote Gemma 3 12B + RAG when the secure service is ready. Android may also ask permission to show warning notifications. You can keep using local keyword warnings without AI consent. Already sent requests cannot be recalled; research sharing is a separate choice. Automatic sending remains disabled in this build."
                     android:textColor="@color/text_secondary"
                     android:textSize="16sp" />
 

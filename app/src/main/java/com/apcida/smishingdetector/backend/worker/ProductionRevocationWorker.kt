@@ -65,8 +65,14 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
         }
         return when (ProductionRevocationClient().revoke(origin, host, token)) {
             ProductionRevocationClient.Result.CONFIRMED -> {
-                credentials.clear()
-                consent.markRemoteDeletionConfirmed()
+                // The backend accepted deletion; keep the local marker pending if
+                // credential cleanup cannot be persisted.
+                try {
+                    credentials.clear()
+                    consent.markRemoteDeletionConfirmed()
+                } catch (_: Exception) {
+                    consent.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED)
+                }
                 Result.success()
             }
             ProductionRevocationClient.Result.AUTH_REJECTED -> {

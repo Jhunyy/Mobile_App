@@ -6,7 +6,7 @@ import com.apcida.smishingdetector.backend.consent.AutomaticAnalysisPolicy
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.detection.BackendKeywordRules
 import com.apcida.smishingdetector.backend.detection.DuplicatePolicy
-import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.backend.remote.ProductionRemoteRuntime
 import com.apcida.smishingdetector.backend.network.RemoteVerdictPolicy
 import com.apcida.smishingdetector.backend.repository.MessageRepository
 import com.apcida.smishingdetector.model.data.AiAnalysisStatus
@@ -19,9 +19,12 @@ import com.apcida.smishingdetector.model.entity.Message
 import com.apcida.smishingdetector.util.HashUtil
 import com.apcida.smishingdetector.util.NotificationHelper
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Incoming SMS: persist and warn locally first. Automatic transport remains security-gated. */
 class SmsController(context: Context) {
+    companion object { private val intakeMutex = Mutex() }
     data class IntakeResult(val messageId: Long, val shouldEnqueueAi: Boolean)
     private val app = context.applicationContext
     private val repository = MessageRepository(AppDatabase.getInstance(app).messageDao())
@@ -34,7 +37,7 @@ class SmsController(context: Context) {
         sourceSmsId: Long? = null,
         alertOnDetection: Boolean = true,
         historicalImport: Boolean = false
-    ): IntakeResult {
+    ): IntakeResult = intakeMutex.withLock {
         require(messageBody.isNotBlank())
         val senderHash = HashUtil.hashSender(sender)
         val contentHash = HashUtil.hashContent(messageBody)
@@ -45,12 +48,12 @@ class SmsController(context: Context) {
             DuplicatePolicy.windowStart(receivedAt), receivedAt)
         if (duplicate != null) {
             if (sourceSmsId != null && duplicate.sourceSmsId == null) repository.bindSourceSmsId(duplicate.messageId, sourceSmsId)
-            return IntakeResult(duplicate.messageId, false)
+            return@withLock IntakeResult(duplicate.messageId, false)
         }
         val snapshot = consent.snapshot()
         val rules = BackendKeywordRules.analyze(messageBody)
         val eligible = AutomaticAnalysisPolicy.eligible(snapshot, receivedAt, historicalImport,
-            RemoteTransportGate.mayTransmit(null, false))
+            ProductionRemoteRuntime.canSchedule(app, snapshot))
         val state = when {
             eligible -> DetectionState.REMOTE_PENDING
             snapshot.enabled && !historicalImport && receivedAt >= snapshot.grantedAt -> DetectionState.REMOTE_UNAVAILABLE
@@ -77,7 +80,7 @@ class SmsController(context: Context) {
             remoteRequestId = UUID.randomUUID().toString(), consentGeneration = if (eligible) snapshot.generation else 0
         )
         val id = repository.insertMessage(message)
-        if (id <= 0) return IntakeResult(repository.getMessageBySourceSmsId(sourceSmsId ?: -1)?.messageId ?: 0, false)
+        if (id <= 0) return@withLock IntakeResult(repository.getMessageBySourceSmsId(sourceSmsId ?: -1)?.messageId ?: 0, false)
         if (alertOnDetection && rules.classification == RiskLevel.SCAM) {
             NotificationHelper.showScamAlert(app, DetectionResult(
                 messageContent = messageBody, riskScore = rules.score.toFloat(),
@@ -128,29 +131,14 @@ class SmsController(context: Context) {
         return true
     }
 
-    suspend fun markAiUnavailable(messageId: Long) {
-        val message = repository.getMessageById(messageId) ?: return
-        if (message.processingState == ProcessingState.COMPLETED.name) return
-        val fallback = RemoteVerdictPolicy.localFallback(message.deterministicRiskLevel)
-        repository.updateMessage(message.copy(
-            aiAnalysisStatus = AiAnalysisStatus.UNAVAILABLE.name,
-            processingState = ProcessingState.REMOTE_UNAVAILABLE.name,
-            detectionState = DetectionState.REMOTE_UNAVAILABLE.name,
-            verdictSource = VerdictSource.LOCAL_RULES.name,
-            finalClassification = fallback,
-            gemmaClassification = null, gemmaConfidence = null, gemmaRationale = null
-        ))
+    suspend fun markAiUnavailable(messageId: Long): Boolean {
+        val message = repository.getMessageById(messageId) ?: return false
+        return repository.failPendingRemoteAnalysis(messageId, message.consentGeneration)
     }
 
     suspend fun markConsentDisabled(messageId: Long) {
         val message = repository.getMessageById(messageId) ?: return
-        if (message.processingState == ProcessingState.COMPLETED.name) return
-        repository.updateMessage(message.copy(
-            processingState = ProcessingState.REMOTE_CONSENT_DISABLED.name,
-            detectionState = DetectionState.REMOTE_CONSENT_DISABLED.name,
-            finalClassification = RemoteVerdictPolicy.localFallback(message.deterministicRiskLevel),
-            verdictSource = VerdictSource.LOCAL_RULES.name
-        ))
+        repository.disablePendingRemoteAnalysis(messageId, message.consentGeneration)
     }
 
     suspend fun queueAiRetry(@Suppress("UNUSED_PARAMETER") messageId: Long): Boolean = false

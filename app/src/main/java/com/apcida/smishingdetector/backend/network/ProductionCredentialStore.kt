@@ -26,6 +26,7 @@ class ProductionCredentialStore(
     private val appContext = context.applicationContext
     private val preferences = appContext
         .getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+    @Volatile private var quarantinedInProcess = false
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -43,18 +44,24 @@ class ProductionCredentialStore(
     fun hasStoredCredential(): Boolean =
         preferences.contains("data") || preferences.contains("iv")
 
+    fun isQuarantinedForInference(): Boolean =
+        quarantinedInProcess || preferences.getBoolean("inference_quarantined", false)
+
     fun provision(token: String) {
         check(!contextRevocationPending()) { "Resolve pending remote deletion before re-enrollment" }
+        check(!hasStoredCredential()) { "Resolve existing installation before enrollment" }
         require(Regex("[A-Za-z0-9_-]{43}").matches(token)) { "Invalid installation credential" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         val encrypted = cipher.doFinal(token.toByteArray(Charsets.US_ASCII))
         val encode = { bytes: ByteArray -> Base64.encodeToString(bytes, Base64.NO_WRAP) }
         check(preferences.edit().putString("iv", encode(cipher.iv))
             .putString("data", encode(encrypted)).remove("inference_quarantined").commit()) { "Could not store installation credential" }
+        quarantinedInProcess = false
     }
 
     override fun get(): String? =
-        if (contextRevocationPending() || preferences.getBoolean("inference_quarantined", false)) null
+        if (contextRevocationPending() || quarantinedInProcess ||
+            preferences.getBoolean("inference_quarantined", false)) null
         else getForRevocation()
 
     /** Retained encrypted only to authenticate the deletion-only request after local revocation. */
@@ -67,7 +74,7 @@ class ProductionCredentialStore(
             String(cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)), Charsets.US_ASCII)
                 .takeIf { Regex("[A-Za-z0-9_-]{43}").matches(it) }
         } catch (_: Exception) {
-            clear()
+            // Keep the encrypted record so revocation stays visibly unresolved.
             null
         }
     }
@@ -77,8 +84,12 @@ class ProductionCredentialStore(
             .getBoolean("remote_deletion_pending", false)
 
     override fun quarantine() {
+        quarantinedInProcess = true
         check(preferences.edit().putBoolean("inference_quarantined", true).commit())
     }
 
-    override fun clear() { preferences.edit().clear().commit() }
+    override fun clear() {
+        check(preferences.edit().clear().commit()) { "Could not clear installation credential" }
+        quarantinedInProcess = false
+    }
 }

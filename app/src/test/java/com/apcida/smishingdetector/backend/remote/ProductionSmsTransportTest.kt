@@ -88,8 +88,16 @@ class ProductionSmsTransportTest {
 
     @Test fun rejectionTimeoutOfflineAndBadResponseFailClosed() = runBlocking {
         val rejected = MemoryCredential()
+        var rejectionRequests = 0
+        val rejectedTransport = transport(rejected, Interceptor { chain ->
+            rejectionRequests++
+            response(chain, 401)
+        })
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
-            transport(rejected, Interceptor { chain -> response(chain, 401) }).analyze(candidate()))
+            rejectedTransport.analyze(candidate()))
+        assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
+            rejectedTransport.analyze(candidate()))
+        assertEquals(1, rejectionRequests)
         assertEquals(1, rejected.quarantines)
         assertNull(rejected.get())
         assertNotNull(rejected.token)
