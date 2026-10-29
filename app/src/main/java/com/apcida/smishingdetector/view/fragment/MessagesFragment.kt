@@ -112,8 +112,8 @@ class MessagesFragment : Fragment() {
 
     override fun onDestroyView() {
         contactLookupJob?.cancel()
-        _binding = null
         super.onDestroyView()
+        _binding = null
     }
 
     private fun setupRepository() {
@@ -274,6 +274,8 @@ class MessagesFragment : Fragment() {
     }
 
     private fun renderMessages() {
+        // A Room emission can arrive while Navigation is tearing down this view.
+        if (_binding == null) return
         val query = binding.inputSearch.text?.toString().orEmpty().trim()
         val visibleMessages = allMessages.asSequence()
             .filter { message ->
