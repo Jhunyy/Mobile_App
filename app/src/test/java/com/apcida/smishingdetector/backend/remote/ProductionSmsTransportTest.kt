@@ -1,6 +1,8 @@
 package com.apcida.smishingdetector.backend.remote
 
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredential
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSource
 import com.apcida.smishingdetector.backend.network.ProductionCredentialSource
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 import com.google.gson.JsonParser
@@ -19,6 +21,9 @@ import java.net.SocketTimeoutException
 class ProductionSmsTransportTest {
     private val origin = "https://sms.example.org"
     private val id = "6d5f9250-3a47-42a8-a06b-68f0b8a82691"
+    private val accessCredential = CloudflareAccessCredential("a".repeat(32) + ".access",
+        "cfast_" + "b".repeat(48))
+    private val accessSource = CloudflareAccessCredentialSource { accessCredential }
     private val consent = AiProtectionConsentStore.Snapshot(true, 1000, 2)
     private fun requirements(endpoint: String = origin) = RemoteTransportGate.Requirements(
         consent, endpoint, "sms.example.org", true, true, true, true)
@@ -39,7 +44,9 @@ class ProductionSmsTransportTest {
             .code(code).message("synthetic").body(body.toResponseBody()).build()
     private fun transport(credential: MemoryCredential, handler: Interceptor,
         gate: RemoteAuthorizationGate = reviewedTestGate, host: String = "sms.example.org",
-        endpoint: String = origin) = ProductionSmsTransport(endpoint, host, credential,
+        endpoint: String = origin,
+        access: CloudflareAccessCredentialSource = accessSource) = ProductionSmsTransport(endpoint, host,
+        credential, access,
         { requirements(endpoint).copy(approvedHost = host) }, gate, OkHttpClient.Builder().addInterceptor(handler)
             .followRedirects(false).followSslRedirects(false).build())
 
@@ -61,6 +68,13 @@ class ProductionSmsTransportTest {
         assertEquals(0, sent)
     }
 
+    @Test fun accessCredentialsRejectHeaderInjectionAndDoNotPrintSecrets() {
+        assertThrows(IllegalArgumentException::class.java) {
+            CloudflareAccessCredential("bad\nheader.access", "cfast_" + "b".repeat(48))
+        }
+        assertFalse(accessCredential.toString().contains(accessCredential.clientSecret))
+    }
+
     @Test fun sendsAuthenticatedProductionContractWithoutPilotMarker() = runBlocking {
         val credential = MemoryCredential()
         var sent = 0
@@ -70,6 +84,8 @@ class ProductionSmsTransportTest {
             assertEquals("https", request.url.scheme)
             assertEquals("/api/v1/sms/analyze", request.url.encodedPath)
             assertEquals("Bearer ${credential.token}", request.header("Authorization"))
+            assertEquals(accessCredential.clientId, request.header("CF-Access-Client-Id"))
+            assertEquals(accessCredential.clientSecret, request.header("CF-Access-Client-Secret"))
             assertEquals(id, request.header("Idempotency-Key"))
             assertNull(request.header("x-apcida-pilot-synthetic"))
             val raw = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
@@ -101,6 +117,9 @@ class ProductionSmsTransportTest {
         assertEquals(1, rejected.quarantines)
         assertNull(rejected.get())
         assertNotNull(rejected.token)
+        assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
+            transport(MemoryCredential(), Interceptor { error("Should not send without Access") },
+                access = CloudflareAccessCredentialSource { null }).analyze(candidate()))
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
             transport(MemoryCredential(null), Interceptor { error("Should not send") }).analyze(candidate()))
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.TIMEOUT),

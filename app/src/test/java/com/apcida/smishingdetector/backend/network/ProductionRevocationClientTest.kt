@@ -13,9 +13,12 @@ import java.io.IOException
 
 class ProductionRevocationClientTest {
     private val token = "a".repeat(43)
-    private fun client(handler: Interceptor) = ProductionRevocationClient(
+    private val access = CloudflareAccessCredential("b".repeat(32) + ".access",
+        "cfast_" + "c".repeat(48))
+    private fun client(handler: Interceptor,
+        accessSource: CloudflareAccessCredentialSource? = null) = ProductionRevocationClient(
         OkHttpClient.Builder().addInterceptor(handler).followRedirects(false)
-            .followSslRedirects(false).build())
+            .followSslRedirects(false).build(), accessSource)
     private fun response(chain: Interceptor.Chain, code: Int) =
         Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
             .code(code).message("synthetic").body("".toResponseBody()).build()
@@ -29,11 +32,14 @@ class ProductionRevocationClientTest {
             assertEquals("https", request.url.scheme)
             assertEquals("/api/v1/installations/me", request.url.encodedPath)
             assertEquals("Bearer $token", request.header("Authorization"))
+            assertEquals(access.clientId, request.header("CF-Access-Client-Id"))
+            assertEquals(access.clientSecret, request.header("CF-Access-Client-Secret"))
             assertNull(request.header("Idempotency-Key"))
             val body = Buffer().also { request.body?.writeTo(it) }
             assertEquals(0L, body.size)
             response(chain, 204)
-        }).revoke("https://sms.example.org", "sms.example.org", token)
+        }, CloudflareAccessCredentialSource { access })
+            .revoke("https://sms.example.org", "sms.example.org", token)
         assertEquals(ProductionRevocationClient.Result.CONFIRMED, result)
         assertEquals(1, sent)
     }
@@ -47,6 +53,13 @@ class ProductionRevocationClientTest {
                 item.revoke(origin, "sms.example.org", token))
         }
         assertEquals(0, sent)
+    }
+
+    @Test fun missingAccessCredentialNeverSendsDeletion() = runBlocking {
+        val item = client(Interceptor { error("Should not send without Access") },
+            CloudflareAccessCredentialSource { null })
+        assertEquals(ProductionRevocationClient.Result.CONFIGURATION_REQUIRED,
+            item.revoke("https://sms.example.org", "sms.example.org", token))
     }
 
     @Test fun rejectedUnavailableAndProxyTimedOutResultsStayUnconfirmed() = runBlocking {

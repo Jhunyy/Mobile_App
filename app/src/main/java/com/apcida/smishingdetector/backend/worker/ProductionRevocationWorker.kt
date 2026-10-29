@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.ProductionRevocationClient
@@ -63,7 +64,9 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
             consent.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.CREDENTIAL_UNAVAILABLE)
             return Result.success()
         }
-        return when (ProductionRevocationClient().revoke(origin, host, token)) {
+        return when (ProductionRevocationClient(
+            accessCredentials = CloudflareAccessCredentialStore(applicationContext)
+        ).revoke(origin, host, token)) {
             ProductionRevocationClient.Result.CONFIRMED -> {
                 // The backend accepted deletion; keep the local marker pending if
                 // credential cleanup cannot be persisted.

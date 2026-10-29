@@ -15,7 +15,8 @@ internal class ProductionRevocationClient(
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(false).followSslRedirects(false).build()
+        .followRedirects(false).followSslRedirects(false).build(),
+    private val accessCredentials: CloudflareAccessCredentialSource? = null
 ) {
     enum class Result { CONFIRMED, AUTH_REJECTED, CONFIGURATION_REQUIRED, RETRYABLE_FAILURE }
 
@@ -26,8 +27,16 @@ internal class ProductionRevocationClient(
                 !Regex("[A-Za-z0-9_-]{43}").matches(token)) {
                 return@withContext Result.CONFIGURATION_REQUIRED
             }
+            val access = accessCredentials?.get()
+            if (accessCredentials != null && access == null) return@withContext Result.CONFIGURATION_REQUIRED
             val request = Request.Builder().url(origin.trimEnd('/') + "/api/v1/installations/me")
-                .header("Authorization", "Bearer $token").delete().build()
+                .header("Authorization", "Bearer $token")
+                .apply {
+                    if (access != null) {
+                        header("CF-Access-Client-Id", access.clientId)
+                        header("CF-Access-Client-Secret", access.clientSecret)
+                    }
+                }.delete().build()
             try {
                 http.executeCancellable(request) { response ->
                     when (response.code) {

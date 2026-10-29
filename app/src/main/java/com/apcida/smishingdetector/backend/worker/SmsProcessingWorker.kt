@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionTiming
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
@@ -108,7 +109,8 @@ class SmsProcessingWorker(appContext: Context, params: WorkerParameters) : Corou
             return Result.success()
         }
         val credentials = ProductionCredentialStore(app)
-        val transport = ProductionSmsTransport(origin, host, credentials,
+        val accessCredentials = CloudflareAccessCredentialStore(app)
+        val transport = ProductionSmsTransport(origin, host, credentials, accessCredentials,
             { ProductionRemoteRuntime.requirements(app, consentStore.snapshot()) })
         val candidate = RemoteSmsCandidate(id, message.senderAddress ?: "Unknown", message.content,
             message.receivedAt, requestId, message.consentGeneration, historicalImport = false)

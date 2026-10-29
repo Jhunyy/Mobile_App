@@ -2,6 +2,8 @@ package com.apcida.smishingdetector.backend.remote
 
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialSource
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredential
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSource
 import com.apcida.smishingdetector.backend.network.ProductionRevocationClient
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 import kotlinx.coroutines.runBlocking
@@ -64,6 +66,9 @@ class ProductionStagingContractTest {
                 chain.proceed(chain.request().newBuilder().url(replacement).build())
             }).build()
         return ProductionSmsTransport(origin, "staging.apcida.invalid", credentials,
+            CloudflareAccessCredentialSource {
+                CloudflareAccessCredential("a".repeat(32) + ".access", "cfast_" + "b".repeat(48))
+            },
             { RemoteTransportGate.Requirements(snapshot(), origin, "staging.apcida.invalid",
                 true, true, true, true) }, testGate, http)
     }

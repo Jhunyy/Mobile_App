@@ -3,6 +3,7 @@ package com.apcida.smishingdetector.backend.remote
 import android.content.Context
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
@@ -17,6 +18,8 @@ internal object ProductionRemoteRuntime {
             !host.orEmpty().endsWith(".trycloudflare.com", ignoreCase = true)
         val credentialPresent = approved &&
             runCatching { ProductionCredentialStore(context.applicationContext).get() != null }
+                .getOrDefault(false) &&
+            runCatching { CloudflareAccessCredentialStore(context.applicationContext).get() != null }
                 .getOrDefault(false)
         return RemoteTransportGate.Requirements(
             consent, origin, host, credentialPresent,

@@ -3,6 +3,15 @@
     xmlns:tools="http://schemas.android.com/tools">
     <application android:networkSecurityConfig="@xml/manual_ai_network_security">
         <activity
+            android:name=".pilot.CloudflareSyntheticActivity"
+            android:exported="true"
+            android:label="Cloudflare Synthetic Test (debug)">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".pilot.PilotManualActivity"
             android:exported="true"
             android:label="Secure Pilot Test (debug)">

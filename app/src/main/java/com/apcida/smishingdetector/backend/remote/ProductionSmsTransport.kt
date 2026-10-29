@@ -1,6 +1,7 @@
 package com.apcida.smishingdetector.backend.remote
 
 import com.apcida.smishingdetector.backend.consent.AutomaticAnalysisPolicy
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSource
 import com.apcida.smishingdetector.backend.network.ProductionCredentialSource
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.ProductionTiming
@@ -26,6 +27,7 @@ internal class ProductionSmsTransport(
     private val origin: String,
     private val approvedHost: String,
     private val credentials: ProductionCredentialSource,
+    private val accessCredentials: CloudflareAccessCredentialSource,
     private val requirements: () -> RemoteTransportGate.Requirements,
     private val gate: RemoteAuthorizationGate = ProductionRemoteAuthorizationGate,
     private val http: OkHttpClient = OkHttpClient.Builder()
@@ -47,6 +49,8 @@ internal class ProductionSmsTransport(
         }
         val token = credentials.get()?.takeIf { Regex("[A-Za-z0-9_-]{43}").matches(it) }
             ?: return@withContext RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED)
+        val access = accessCredentials.get()
+            ?: return@withContext RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED)
         if (candidate.text.length > 2000 || candidate.sender.length > 100 ||
             !Regex("[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}").matches(candidate.requestId)) {
             return@withContext RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.INVALID_RESPONSE)
@@ -59,6 +63,8 @@ internal class ProductionSmsTransport(
         }
         val request = Request.Builder().url(origin.trimEnd('/') + "/api/v1/sms/analyze")
             .header("Authorization", "Bearer $token")
+            .header("CF-Access-Client-Id", access.clientId)
+            .header("CF-Access-Client-Secret", access.clientSecret)
             .header("Idempotency-Key", candidate.requestId)
             .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
