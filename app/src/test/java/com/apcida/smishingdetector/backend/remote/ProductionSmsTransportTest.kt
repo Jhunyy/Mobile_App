@@ -69,6 +69,8 @@ class ProductionSmsTransportTest {
     }
 
     @Test fun accessCredentialsRejectHeaderInjectionAndDoNotPrintSecrets() {
+        val generated = CloudflareAccessCredential("device.access.example.com", "cfast_" + "b".repeat(48))
+        assertEquals("device.access.example.com", generated.clientId)
         assertThrows(IllegalArgumentException::class.java) {
             CloudflareAccessCredential("bad\nheader.access", "cfast_" + "b".repeat(48))
         }

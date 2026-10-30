@@ -22,6 +22,8 @@ import com.apcida.smishingdetector.backend.remote.RemoteAnalysisReply
 import com.apcida.smishingdetector.backend.remote.RemoteAuthorizationGate
 import com.apcida.smishingdetector.backend.remote.RemoteSmsCandidate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** Manual debug fixture. It has no inbox or SMS receiver access and never opens the production gate. */
@@ -29,6 +31,7 @@ class CloudflareSyntheticActivity : AppCompatActivity() {
     private lateinit var backend: ProductionCredentialStore
     private lateinit var access: CloudflareAccessCredentialStore
     private lateinit var backendInput: EditText
+    private lateinit var inviteInput: EditText
     private lateinit var clientIdInput: EditText
     private lateinit var clientSecretInput: EditText
     private lateinit var messageInput: EditText
@@ -54,6 +57,41 @@ class CloudflareSyntheticActivity : AppCompatActivity() {
         layout.addView(label("Cloudflare synthetic test · debug only"))
         layout.addView(label("Approved host: ${BuildConfig.PRODUCTION_APPROVED_HOST.ifBlank { "Not configured" }}"))
         layout.addView(label("Use a temporary test installation. Never enter a real SMS here."))
+        inviteInput = secretInput("One-time beta invite code").also(layout::addView)
+        layout.addView(Button(this).apply {
+            text = "Set up this test phone with invite"
+            setOnClickListener {
+                if (backend.hasStoredCredential() || access.hasStoredCredential()) {
+                    result.text = "Remove existing test credentials before using an invite."
+                    return@setOnClickListener
+                }
+                val code = inviteInput.text.toString().trim()
+                inviteInput.text?.clear()
+                isEnabled = false
+                result.text = "Setting up this test phone…"
+                val button = this
+                lifecycleScope.launch {
+                    result.text = try {
+                        withContext(Dispatchers.IO) {
+                            val bundle = BetaInviteClient.redeem(BuildConfig.PRODUCTION_APPROVED_HOST, code)
+                            try {
+                                backend.provision(bundle.installationToken)
+                                access.provision(bundle.clientId, bundle.clientSecret)
+                            } catch (error: Exception) {
+                                backend.clear()
+                                access.clear()
+                                throw error
+                            }
+                        }
+                        "This test phone has its own credentials. Use invented text only."
+                    } catch (_: Exception) {
+                        "Setup failed. Check the invite and connection; ask the owner for a new invite if needed."
+                    }
+                    button.isEnabled = true
+                }
+            }
+        })
+        layout.addView(label("Invite setup is for a supervised beta. The owner must enable the server enrollment route first."))
         backendInput = secretInput("Backend installation token").also(layout::addView)
         clientIdInput = secretInput("Cloudflare Client ID").also(layout::addView)
         clientSecretInput = secretInput("Cloudflare Client Secret").also(layout::addView)
@@ -145,6 +183,7 @@ class CloudflareSyntheticActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (::inviteInput.isInitialized) inviteInput.text?.clear()
         if (::backendInput.isInitialized) backendInput.text?.clear()
         if (::clientIdInput.isInitialized) clientIdInput.text?.clear()
         if (::clientSecretInput.isInitialized) clientSecretInput.text?.clear()

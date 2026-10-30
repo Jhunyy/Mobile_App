@@ -15,7 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
 /** One installation's Cloudflare Access credential. Never put these values in BuildConfig or an APK. */
 class CloudflareAccessCredential(val clientId: String, val clientSecret: String) {
     init {
-        require(Regex("[A-Za-z0-9_-]{1,120}\\.access").matches(clientId))
+        require(Regex("[A-Za-z0-9_-]{1,120}\\.access(?:\\.[A-Za-z0-9.-]{1,100})?").matches(clientId))
         require(Regex("[A-Za-z0-9_-]{32,256}").matches(clientSecret))
     }
 
