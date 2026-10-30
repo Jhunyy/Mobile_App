@@ -109,7 +109,7 @@ class ProductionSmsTransportTest {
         var rejectionRequests = 0
         val rejectedTransport = transport(rejected, Interceptor { chain ->
             rejectionRequests++
-            response(chain, 401)
+            response(chain, 401, """{"error":"UNAUTHORIZED"}""")
         })
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
             rejectedTransport.analyze(candidate()))
@@ -119,6 +119,19 @@ class ProductionSmsTransportTest {
         assertEquals(1, rejected.quarantines)
         assertNull(rejected.get())
         assertNotNull(rejected.token)
+        val activating = MemoryCredential()
+        var activationRequests = 0
+        val activatingTransport = transport(activating, Interceptor { chain ->
+            activationRequests++
+            if (activationRequests == 1) response(chain, 401, "Cloudflare token pending")
+            else response(chain, 200,
+                """{"messageId":"$id","classification":"SAFE","confidence":"HIGH","rationale":"Mock reminder"}""")
+        })
+        assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.SERVER_UNAVAILABLE),
+            activatingTransport.analyze(candidate()))
+        assertEquals(0, activating.quarantines)
+        assertTrue(activatingTransport.analyze(candidate()) is RemoteAnalysisReply.Verified)
+        assertEquals(2, activationRequests)
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED),
             transport(MemoryCredential(), Interceptor { error("Should not send without Access") },
                 access = CloudflareAccessCredentialSource { null }).analyze(candidate()))

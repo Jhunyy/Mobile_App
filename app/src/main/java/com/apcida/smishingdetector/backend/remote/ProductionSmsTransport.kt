@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.io.InterruptedIOException
@@ -71,7 +72,11 @@ internal class ProductionSmsTransport(
         try {
             http.executeCancellable(request) { response ->
                 when (response.code) {
-                    401, 403 -> {
+                    401 -> if (isBackendUnauthorized(response)) {
+                        credentials.quarantine()
+                        RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED)
+                    } else RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.SERVER_UNAVAILABLE)
+                    403 -> {
                         credentials.quarantine()
                         RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.CREDENTIAL_REVOKED)
                     }
@@ -92,6 +97,13 @@ internal class ProductionSmsTransport(
             RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.INVALID_RESPONSE)
         }
     }
+
+    // Cloudflare can return a transient 401 before a newly issued service token is active.
+    // Only the backend's exact auth error proves that the installation token is invalid.
+    private fun isBackendUnauthorized(response: Response): Boolean = try {
+        val json = JsonParser().parse(response.peekBody(1024).string()).asJsonObject
+        json.entrySet().size == 1 && json.get("error")?.asString == "UNAUTHORIZED"
+    } catch (_: Exception) { false }
 
     private fun parse(raw: String?, expectedId: String): RemoteAnalysisReply = try {
         val value = JsonParser().parse(raw).getAsJsonObject()
