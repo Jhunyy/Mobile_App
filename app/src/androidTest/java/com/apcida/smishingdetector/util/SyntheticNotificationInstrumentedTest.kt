@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -56,7 +57,12 @@ class SyntheticNotificationInstrumentedTest {
                 active().single().notification.extras.getString("android.title"))
             assertTrue(active().single().notification.flags and android.app.Notification.FLAG_ONLY_ALERT_ONCE != 0)
             NotificationHelper.cancelAlert(context, id)
-            assertTrue(active().isEmpty())
+            // The system notification service processes cancellation on its handler.
+            val deadline = SystemClock.elapsedRealtime() + 5_000L
+            while (active().isNotEmpty() && SystemClock.elapsedRealtime() < deadline) {
+                SystemClock.sleep(50)
+            }
+            assertTrue("Scam alert remained active after cancellation", active().isEmpty())
         } finally { NotificationHelper.cancelAlert(context, id) }
     }
 }
