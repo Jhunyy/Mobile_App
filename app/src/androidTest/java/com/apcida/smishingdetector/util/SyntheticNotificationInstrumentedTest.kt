@@ -44,14 +44,25 @@ class SyntheticNotificationInstrumentedTest {
 
         val id = 2_000_003_001L
         fun active() = manager.activeNotifications.filter { it.id == id.toInt() }
+        fun awaitTitle(expected: String) {
+            val deadline = SystemClock.elapsedRealtime() + 5_000L
+            var observed = active()
+            while ((observed.size != 1 ||
+                    observed.single().notification.extras.getString("android.title") != expected) &&
+                SystemClock.elapsedRealtime() < deadline) {
+                SystemClock.sleep(50)
+                observed = active()
+            }
+            assertEquals("Expected one active synthetic scam alert", 1, observed.size)
+            assertEquals(expected,
+                observed.single().notification.extras.getString("android.title"))
+        }
         try {
             NotificationHelper.showScamAlert(context, DetectionResult(
                 messageContent = "Synthetic local warning", riskScore = 80f,
                 riskLevel = RiskLevel.SCAM, isFlagged = true, matchedKeywords = emptyList(),
                 finalClassification = "SCAM", finalRationale = null), id)
-            assertEquals(1, active().size)
-            val localTitle = active().single().notification.extras.getString("android.title")
-            assertEquals("High-risk SMS detected", localTitle)
+            awaitTitle("High-risk SMS detected")
 
             // Timeout/network failure leaves the local warning in place; no SAFE notice is posted.
             assertEquals(1, active().size)
@@ -60,9 +71,7 @@ class SyntheticNotificationInstrumentedTest {
                 riskLevel = RiskLevel.SCAM, isFlagged = true, matchedKeywords = emptyList(),
                 gemmaInvoked = true, finalClassification = "SCAM",
                 finalRationale = "Synthetic mock response"), id)
-            assertEquals(1, active().size)
-            assertEquals("Potential scam SMS detected",
-                active().single().notification.extras.getString("android.title"))
+            awaitTitle("Potential scam SMS detected")
             assertTrue(active().single().notification.flags and android.app.Notification.FLAG_ONLY_ALERT_ONCE != 0)
             NotificationHelper.cancelAlert(context, id)
             // The system notification service processes cancellation on its handler.
