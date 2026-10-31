@@ -23,11 +23,19 @@ import org.junit.runner.RunWith
 @SdkSuppress(minSdkVersion = 23)
 class SyntheticNotificationInstrumentedTest {
     @Test fun localWarningIsUpdatedOnceAndSurvivesUnavailableAnalysis() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
         val manager = context.getSystemService(NotificationManager::class.java)
-        assumeTrue("Enable notifications for the ApCiDa debug app before this test",
+        // Gradle installs a fresh debug app for connected tests, so grant its runtime
+        // notification permission here rather than relying on a previous installation.
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        assertTrue("Notifications are disabled for the ApCiDa debug app",
             NotificationManagerCompat.from(context).areNotificationsEnabled())
-        assumeTrue("Grant POST_NOTIFICATIONS to the ApCiDa debug app before this test",
+        assertTrue("POST_NOTIFICATIONS was not granted to the ApCiDa debug app",
             Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
             context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
         assumeTrue("Enable scam alerts in ApCiDa Settings before this test",
