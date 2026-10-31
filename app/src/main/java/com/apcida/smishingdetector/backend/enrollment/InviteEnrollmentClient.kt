@@ -1,4 +1,4 @@
-package com.apcida.smishingdetector.pilot
+package com.apcida.smishingdetector.backend.enrollment
 
 import com.apcida.smishingdetector.backend.network.CloudflareAccessCredential
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
@@ -6,8 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Debug-only invite redemption. The invitation itself is a short-lived one-use secret. */
-internal object BetaInviteClient {
+/** Redeems one private invite. This does not grant SMS consent or open the production transport gate. */
+internal object InviteEnrollmentClient {
     data class Bundle(val installationToken: String, val clientId: String,
                       val clientSecret: String)
 
@@ -21,7 +21,9 @@ internal object BetaInviteClient {
             connectTimeout = 10000
             readTimeout = 20000
             instanceFollowRedirects = false
+            useCaches = false
             setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Cache-Control", "no-store")
             doOutput = true
         }
         try {

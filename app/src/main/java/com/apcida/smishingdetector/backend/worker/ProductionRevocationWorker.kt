@@ -27,20 +27,28 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
         fun enqueueIfPending(context: Context, replace: Boolean = false) {
             val app = context.applicationContext
             val consent = AiProtectionConsentStore(app)
-            if (!consent.remoteDeletionPending()) return
-            if (!replace && consent.remoteDeletionStatus() in setOf(
+            val pending = consent.remoteDeletionPending()
+            val serverConfirmed = consent.remoteDeletionStatus() ==
+                AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED
+            val localCleanup = serverConfirmed &&
+                (ProductionCredentialStore(app).hasStoredCredential() ||
+                    CloudflareAccessCredentialStore(app).hasStoredCredential())
+            if (!pending && !localCleanup) return
+            if (pending && !serverConfirmed && !replace && consent.remoteDeletionStatus() in setOf(
                     AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED,
                     AiProtectionConsentStore.RemoteDeletionStatus.AUTH_REJECTED,
                     AiProtectionConsentStore.RemoteDeletionStatus.CREDENTIAL_UNAVAILABLE)) return
             val host = BuildConfig.PRODUCTION_APPROVED_HOST
-            if (!ProductionEndpointPolicy.isApprovedHttpsOrigin("https://$host", host) ||
-                host.endsWith(".trycloudflare.com", ignoreCase = true)) {
+            if (pending && !serverConfirmed &&
+                (!ProductionEndpointPolicy.isApprovedHttpsOrigin("https://$host", host) ||
+                host.endsWith(".trycloudflare.com", ignoreCase = true))) {
                 AiProtectionConsentStore(app).markRemoteDeletionStatus(
                     AiProtectionConsentStore.RemoteDeletionStatus.CONFIGURATION_REQUIRED)
                 return
             }
             val work = OneTimeWorkRequestBuilder<ProductionRevocationWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .apply { if (pending && !serverConfirmed) setConstraints(Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED).build()) }
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(app).enqueueUniqueWork(
@@ -50,7 +58,20 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         val consent = AiProtectionConsentStore(applicationContext)
-        if (!consent.remoteDeletionPending()) return Result.success()
+        val credentials = ProductionCredentialStore(applicationContext)
+        val access = CloudflareAccessCredentialStore(applicationContext)
+        val serverConfirmed = consent.remoteDeletionStatus() ==
+            AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED
+        if (!consent.remoteDeletionPending() || serverConfirmed) {
+            if (!consent.remoteDeletionPending() && !serverConfirmed)
+                return Result.success()
+            return try {
+                if (consent.remoteDeletionPending()) consent.markRemoteDeletionConfirmed()
+                credentials.clear()
+                access.clear()
+                Result.success()
+            } catch (_: Exception) { Result.retry() }
+        }
         val host = BuildConfig.PRODUCTION_APPROVED_HOST
         val origin = "https://$host"
         if (!ProductionEndpointPolicy.isApprovedHttpsOrigin(origin, host) ||
@@ -58,23 +79,25 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
             consent.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.CONFIGURATION_REQUIRED)
             return Result.success()
         }
-        val credentials = ProductionCredentialStore(applicationContext)
         val token = credentials.getForRevocation()
         if (token == null) {
             consent.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.CREDENTIAL_UNAVAILABLE)
             return Result.success()
         }
         return when (ProductionRevocationClient(
-            accessCredentials = CloudflareAccessCredentialStore(applicationContext)
+            accessCredentials = access
         ).revoke(origin, host, token)) {
             ProductionRevocationClient.Result.CONFIRMED -> {
-                // The backend accepted deletion; keep the local marker pending if
-                // credential cleanup cannot be persisted.
+                // Record server confirmation before clearing either local credential.
+                // The next worker run can finish local cleanup without authenticating again.
                 try {
-                    credentials.clear()
+                    consent.markRemoteDeletionStatus(
+                        AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED)
                     consent.markRemoteDeletionConfirmed()
+                    credentials.clear()
+                    access.clear()
                 } catch (_: Exception) {
-                    consent.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED)
+                    return Result.retry()
                 }
                 Result.success()
             }

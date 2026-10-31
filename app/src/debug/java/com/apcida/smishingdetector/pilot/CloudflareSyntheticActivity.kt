@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.enrollment.InviteEnrollmentService
 import com.apcida.smishingdetector.backend.network.CloudflareAccessCredential
 import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
@@ -22,8 +23,6 @@ import com.apcida.smishingdetector.backend.remote.RemoteAnalysisReply
 import com.apcida.smishingdetector.backend.remote.RemoteAuthorizationGate
 import com.apcida.smishingdetector.backend.remote.RemoteSmsCandidate
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** Manual debug fixture. It has no inbox or SMS receiver access and never opens the production gate. */
@@ -71,21 +70,16 @@ class CloudflareSyntheticActivity : AppCompatActivity() {
                 result.text = "Setting up this test phone…"
                 val button = this
                 lifecycleScope.launch {
-                    result.text = try {
-                        withContext(Dispatchers.IO) {
-                            val bundle = BetaInviteClient.redeem(BuildConfig.PRODUCTION_APPROVED_HOST, code)
-                            try {
-                                backend.provision(bundle.installationToken)
-                                access.provision(bundle.clientId, bundle.clientSecret)
-                            } catch (error: Exception) {
-                                backend.clear()
-                                access.clear()
-                                throw error
-                            }
-                        }
-                        "This test phone has its own credentials. Use invented text only."
-                    } catch (_: Exception) {
-                        "Setup failed. Check the invite and connection; ask the owner for a new invite if needed."
+                    result.text = when (InviteEnrollmentService(this@CloudflareSyntheticActivity)
+                        .enroll(BuildConfig.PRODUCTION_APPROVED_HOST, code)) {
+                        InviteEnrollmentService.Result.SET_UP ->
+                            "This test phone has its own credentials. Use invented text only."
+                        InviteEnrollmentService.Result.ALREADY_CONFIGURED ->
+                            "Existing credentials or pending deletion must be resolved first."
+                        InviteEnrollmentService.Result.FAILED ->
+                            "Setup failed. Check the invite and connection; ask the owner for a new invite if needed."
+                        InviteEnrollmentService.Result.OWNER_CLEANUP_REQUIRED ->
+                            "Setup incomplete. Do not use this phone for analysis; ask the owner to revoke its installation and issue a new invite."
                     }
                     button.isEnabled = true
                 }

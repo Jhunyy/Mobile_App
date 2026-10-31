@@ -9,10 +9,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -26,6 +28,8 @@ import androidx.navigation.fragment.findNavController
 import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
+import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
+import com.apcida.smishingdetector.backend.enrollment.InviteEnrollmentService
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 import com.apcida.smishingdetector.view.presentation.ProtectionStatusPresentation
@@ -49,6 +53,7 @@ class SettingsFragment : Fragment() {
     private lateinit var notificationSwitch: SwitchCompat
     private lateinit var namesSwitch: SwitchCompat
     private lateinit var contactsSwitch: SwitchCompat
+    private var inviteSetupInProgress = false
 
     private val requestSms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         if (PermissionHelper.hasReadSmsPermission(requireContext())) {
@@ -146,6 +151,18 @@ class SettingsFragment : Fragment() {
             }
         }
         protection.addView(deletionStatus)
+        if (BuildConfig.DEBUG || RemoteTransportGate.PRODUCTION_READY) {
+            divider(protection)
+            linkRow(protection, R.drawable.ic_safety, "Set up invite-only service",
+                "Use one private code for this phone. Setup does not enable automatic SMS analysis.") {
+                showInviteSetup()
+            }
+            divider(protection)
+            linkRow(protection, R.drawable.ic_safety, "Remove this phone's service access",
+                "Revoke this phone's server access and erase its cached analysis responses.") {
+                showRemoveServiceAccess()
+            }
+        }
 
         section(body, "Permissions", 26)
         val permissions = card(body)
@@ -252,6 +269,95 @@ class SettingsFragment : Fragment() {
                     Uri.fromParts("package", requireContext().packageName, null)))
             }.show()
         refreshSwitches()
+    }
+
+    private fun showInviteSetup() {
+        if (inviteSetupInProgress) return
+        val context = requireContext()
+        val host = BuildConfig.PRODUCTION_APPROVED_HOST
+        if (!ProductionEndpointPolicy.isApprovedHttpsOrigin("https://$host", host) ||
+            host.endsWith(".trycloudflare.com", ignoreCase = true)) {
+            AlertDialog.Builder(context).setMessage("The approved service address is not configured in this app build.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        if (AiProtectionConsentStore(context).remoteDeletionPending() ||
+            ProductionCredentialStore(context).hasStoredCredential() ||
+            CloudflareAccessCredentialStore(context).hasStoredCredential()) {
+            AlertDialog.Builder(context).setMessage("This phone already has service credentials or a deletion is pending. Ask the owner before using another invite.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val input = EditText(context).apply {
+            hint = "One-time invite code"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+        }
+        val container = LinearLayout(context).apply {
+            setPadding(dp(20), 0, dp(20), 0)
+            addView(input)
+        }
+        AlertDialog.Builder(context)
+            .setTitle("Set up this phone")
+            .setMessage(if (RemoteTransportGate.PRODUCTION_READY)
+                "Enter the private invite from the owner. Remote analysis still needs your separate consent."
+                else "Enter the private invite from the owner. This build will not send SMS for remote analysis automatically.")
+            .setView(container)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Set up") { _, _ ->
+                val code = input.text.toString().trim()
+                input.text?.clear()
+                if (!Regex("[A-Za-z0-9_-]{43}").matches(code)) {
+                    AlertDialog.Builder(requireContext()).setMessage("Check the invite code and try again.")
+                        .setPositiveButton("OK", null).show()
+                } else {
+                    inviteSetupInProgress = true
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val outcome = try {
+                            InviteEnrollmentService(context).enroll(host, code)
+                        } finally {
+                            inviteSetupInProgress = false
+                        }
+                        if (!isAdded || view == null) return@launch
+                        val message = when (outcome) {
+                            InviteEnrollmentService.Result.SET_UP ->
+                                "This phone has its own service credentials. Automatic SMS analysis remains off in this build."
+                            InviteEnrollmentService.Result.ALREADY_CONFIGURED ->
+                                "Existing credentials or pending deletion must be resolved first."
+                            InviteEnrollmentService.Result.FAILED ->
+                                "Setup did not finish. Ask the owner for a new invite if needed."
+                            InviteEnrollmentService.Result.OWNER_CLEANUP_REQUIRED ->
+                                "Setup is incomplete. Do not use this phone for analysis. Ask the owner to revoke this installation before issuing another invite."
+                        }
+                        AlertDialog.Builder(requireContext()).setMessage(message)
+                            .setPositiveButton("OK", null).show()
+                        refreshSwitches()
+                    }
+                }
+            }
+            .create().apply {
+                setOnDismissListener { input.text?.clear() }
+                show()
+            }
+    }
+
+    private fun showRemoveServiceAccess() {
+        val context = requireContext()
+        if (!ProductionCredentialStore(context).hasStoredCredential()) {
+            val message = if (CloudflareAccessCredentialStore(context).hasStoredCredential())
+                "This phone has incomplete service setup. Ask the owner to revoke its installation."
+            else "This phone has no service access to remove."
+            AlertDialog.Builder(context).setMessage(message).setPositiveButton("OK", null).show()
+            return
+        }
+        AlertDialog.Builder(context)
+            .setTitle("Remove service access?")
+            .setMessage("ApCiDa will stop future remote analysis for this phone and request deletion of its server installation and cached responses. Keep this phone online until Settings confirms deletion.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Remove access") { _, _ ->
+                AiProtectionConsentStore(context).revoke()
+                refreshSwitches()
+            }.show()
     }
 
     private fun section(parent: LinearLayout, title: String, top: Int) {
