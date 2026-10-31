@@ -83,7 +83,9 @@ class AiProtectionConsentStore(
     }
 
     companion object {
-        const val DISCLOSURE_VERSION = 1
+        // Version 1 could be accepted before remote analysis was available. Do not
+        // reuse that earlier choice when a future build enables automatic sending.
+        const val DISCLOSURE_VERSION = 2
         const val AUTO_REMOTE_TAG = "automatic_remote_sms"
     }
 }

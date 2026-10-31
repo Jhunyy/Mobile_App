@@ -10,6 +10,7 @@ import com.apcida.smishingdetector.R
 import com.apcida.smishingdetector.databinding.ActivityOnboardingBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
+import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 import android.widget.Toast
 
 class OnboardingFragment : Fragment() {
@@ -47,6 +48,10 @@ class OnboardingFragment : Fragment() {
 
             // Done button (shown after verification)
             btnDone.setOnClickListener {
+                if (!RemoteTransportGate.PRODUCTION_READY) {
+                    continueLocally()
+                    return@setOnClickListener
+                }
                 if (!checkAiConsent.isChecked) {
                     Toast.makeText(requireContext(), "Check the consent box to enable AI Protection.", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
@@ -81,6 +86,12 @@ class OnboardingFragment : Fragment() {
 
             // Show verified state
             layoutVerified.visibility = View.VISIBLE
+            if (!RemoteTransportGate.PRODUCTION_READY) {
+                textVerifiedTitle.text = "Keyword protection is ready"
+                checkAiConsent.visibility = View.GONE
+                textLimitedProtection.visibility = View.GONE
+                btnDone.text = "Continue with keyword-only protection"
+            }
         }
     }
 

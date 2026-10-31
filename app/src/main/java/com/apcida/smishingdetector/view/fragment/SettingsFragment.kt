@@ -107,6 +107,11 @@ class SettingsFragment : Fragment() {
                     store.reconcileRevokedPending()
                 }
                 refreshSwitches()
+            } else if (!RemoteTransportGate.PRODUCTION_READY) {
+                AlertDialog.Builder(requireContext())
+                    .setMessage("Remote AI is not available in this build. Local keyword warnings remain active; no new SMS is sent to the server automatically.")
+                    .setPositiveButton("OK", null).show()
+                refreshSwitches()
             } else if (!PermissionHelper.hasSmsPermissions(requireContext())) {
                 AlertDialog.Builder(requireContext())
                     .setMessage("Grant SMS permission before enabling AI Protection.")
