@@ -32,4 +32,11 @@ internal object ProductionRemoteRuntime {
     fun canSchedule(context: Context, consent: AiProtectionConsentStore.Snapshot): Boolean =
         RemoteTransportGate.PRODUCTION_READY &&
             RemoteTransportGate.canTransmit(requirements(context, consent))
+
+    /** Setup check before asking for consent; never authorizes a transmission itself. */
+    fun isConfigured(context: Context): Boolean {
+        val value = requirements(context, AiProtectionConsentStore.Snapshot(false, 0, 0))
+        return value.hasPerInstallCredential && value.serverIdentityValidated &&
+            value.backgroundRequestsReady && value.privacySafeErrorHandling
+    }
 }

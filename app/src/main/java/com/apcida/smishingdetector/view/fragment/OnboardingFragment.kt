@@ -11,6 +11,7 @@ import com.apcida.smishingdetector.databinding.ActivityOnboardingBinding
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.backend.remote.ProductionRemoteRuntime
 import android.widget.Toast
 
 class OnboardingFragment : Fragment() {
@@ -58,6 +59,11 @@ class OnboardingFragment : Fragment() {
                 }
                 if (!PermissionHelper.hasSmsPermissions(requireContext())) {
                     Toast.makeText(requireContext(), "SMS permission is required first.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (!ProductionRemoteRuntime.isConfigured(requireContext())) {
+                    Toast.makeText(requireContext(), "Set up this phone with an invite in Settings first.",
+                        Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
                 AiProtectionConsentStore(requireContext()).grant()

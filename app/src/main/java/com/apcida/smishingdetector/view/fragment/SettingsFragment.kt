@@ -32,6 +32,7 @@ import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSto
 import com.apcida.smishingdetector.backend.enrollment.InviteEnrollmentService
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
+import com.apcida.smishingdetector.backend.remote.ProductionRemoteRuntime
 import com.apcida.smishingdetector.view.presentation.ProtectionStatusPresentation
 import com.apcida.smishingdetector.util.Constants
 import com.apcida.smishingdetector.util.ContactNameResolver
@@ -106,7 +107,9 @@ class SettingsFragment : Fragment() {
         section(body, "AI Protection", 26)
         val protection = card(body)
         aiSwitch = switchRow(protection, R.drawable.ic_safety, "AI Protection",
-            "Consent to remote analysis of each new SMS. Secure service setup is pending; local keyword warnings remain active.") { enabled ->
+            if (RemoteTransportGate.PRODUCTION_READY)
+                "With your consent, analyze each new SMS remotely. Local keyword warnings remain active."
+            else "Consent to remote analysis of each new SMS. Secure service setup is pending; local keyword warnings remain active.") { enabled ->
             val store = AiProtectionConsentStore(requireContext())
             if (!enabled) {
                 store.revoke()
@@ -124,10 +127,15 @@ class SettingsFragment : Fragment() {
                     .setMessage("Grant SMS permission before enabling AI Protection.")
                     .setPositiveButton("OK", null).show()
                 refreshSwitches()
+            } else if (!ProductionRemoteRuntime.isConfigured(requireContext())) {
+                AlertDialog.Builder(requireContext())
+                    .setMessage("Set up this phone with an invite before enabling remote AI analysis.")
+                    .setPositiveButton("OK", null).show()
+                refreshSwitches()
             } else {
                 AlertDialog.Builder(requireContext())
                     .setTitle("Enable AI Protection?")
-                    .setMessage("ApCiDa will automatically send each newly received SMS text, sender, receipt time and request ID to its remote Gemma 3 12B + RAG service. Local keyword warnings continue if the service is unavailable. You can revoke this in Settings; requests already sent cannot be recalled. Research contribution is separate. Automatic sending stays disabled until secure HTTPS and per-install authentication are ready.")
+                    .setMessage("ApCiDa will automatically send each newly received SMS text, sender, receipt time and request ID to its remote Gemma 3 12B + RAG service. Local keyword warnings continue if the service is unavailable. You can revoke this in Settings; requests already sent cannot be recalled. Research contribution is separate.")
                     .setNegativeButton("Cancel") { _, _ -> refreshSwitches() }
                     .setPositiveButton("I agree") { _, _ -> store.grant(); refreshSwitches() }
                     .show()
