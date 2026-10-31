@@ -42,6 +42,8 @@ import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 
 class SettingsFragment : Fragment() {
     private lateinit var aiSwitch: SwitchCompat
@@ -230,9 +232,19 @@ class SettingsFragment : Fragment() {
             consent.enabled, RemoteTransportGate.PRODUCTION_READY, approvedHost)
         localStatus.text = ProtectionStatusPresentation.local(PermissionHelper.hasSmsPermissions(context))
         val credential = ProductionCredentialStore(context)
-        credentialStatus.text = ProtectionStatusPresentation.credential(
+        val credentialSummary = ProtectionStatusPresentation.credential(
             credential.hasStoredCredential(), credential.isQuarantinedForInference(),
             protectionStore.remoteDeletionPending())
+        val expiresAt = credential.expiresAtMillis()
+        credentialStatus.text = when {
+            !credential.hasStoredCredential() || expiresAt == null ||
+                protectionStore.remoteDeletionPending() -> credentialSummary
+            credential.isExpired() ->
+                "Installation credential: expired. Ask the owner to retire it and issue a new invite."
+            else -> "$credentialSummary Expires ${DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM, DateFormat.SHORT).format(Date(expiresAt))}. " +
+                "Remove service access before then to use a fresh invite."
+        }
         if (::deletionStatus.isInitialized) {
             val status = protectionStore.remoteDeletionStatus()
             deletionStatus.text = when (status) {
@@ -284,7 +296,10 @@ class SettingsFragment : Fragment() {
         if (AiProtectionConsentStore(context).remoteDeletionPending() ||
             ProductionCredentialStore(context).hasStoredCredential() ||
             CloudflareAccessCredentialStore(context).hasStoredCredential()) {
-            AlertDialog.Builder(context).setMessage("This phone already has service credentials or a deletion is pending. Ask the owner before using another invite.")
+            val message = if (ProductionCredentialStore(context).isExpired())
+                "This phone's service credential has expired. Ask the owner to retire its installation before using a new invite."
+            else "This phone already has service credentials or a deletion is pending. Remove its service access before using another invite."
+            AlertDialog.Builder(context).setMessage(message)
                 .setPositiveButton("OK", null).show()
             return
         }

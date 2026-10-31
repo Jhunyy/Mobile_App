@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -14,6 +15,34 @@ import java.util.UUID
 /** Uses isolated test preferences and Keystore alias; never touches a provisioned credential. */
 @RunWith(AndroidJUnit4::class)
 class ProductionCredentialStoreInstrumentedTest {
+    @Test fun expiredCredentialBlocksAnalysisButRemainsAvailableForDeletion() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val suffix = UUID.randomUUID().toString()
+        val prefsName = "production_expiry_test_$suffix"
+        val alias = "apcida_production_expiry_test_$suffix"
+        val consentPrefsName = "production_expiry_consent_test_$suffix"
+        val token = "b".repeat(43)
+        var currentTime = 1_700_000_000_000L
+        val expiry = currentTime + 29L * 24 * 60 * 60 * 1000
+        try {
+            val store = ProductionCredentialStore(context, prefsName, alias, consentPrefsName,
+                now = { currentTime })
+            store.provision(token, expiry)
+            assertEquals(expiry, store.expiresAtMillis())
+            assertEquals(token, store.get())
+            currentTime = expiry
+            val reopened = ProductionCredentialStore(context, prefsName, alias, consentPrefsName,
+                now = { currentTime })
+            assertTrue(reopened.isExpired())
+            assertNull(reopened.get())
+            assertEquals(token, reopened.getForRevocation())
+        } finally {
+            context.getSharedPreferences(prefsName, 0).edit().clear().commit()
+            context.getSharedPreferences(consentPrefsName, 0).edit().clear().commit()
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+        }
+    }
+
     @Test fun encryptedCredentialPersistsAcrossStoreRecreationAndClears() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val suffix = UUID.randomUUID().toString()

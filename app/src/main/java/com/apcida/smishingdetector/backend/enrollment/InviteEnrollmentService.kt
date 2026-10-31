@@ -35,7 +35,7 @@ internal class InviteEnrollmentService(context: Context) {
                     return@withLock Result.FAILED
                 }
                 try {
-                    backend.provision(bundle.installationToken)
+                    backend.provision(bundle.installationToken, bundle.expiresAt)
                     access.provision(bundle.clientId, bundle.clientSecret)
                     return@withLock Result.SET_UP
                 } catch (_: Exception) {

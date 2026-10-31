@@ -9,7 +9,7 @@ import java.net.URL
 /** Redeems one private invite. This does not grant SMS consent or open the production transport gate. */
 internal object InviteEnrollmentClient {
     data class Bundle(val installationToken: String, val clientId: String,
-                      val clientSecret: String)
+                      val clientSecret: String, val expiresAt: Long)
 
     fun redeem(host: String, code: String): Bundle {
         val origin = "https://$host"
@@ -35,9 +35,11 @@ internal object InviteEnrollmentClient {
             val json = JSONObject(body)
             val token = json.getString("installationToken")
             require(Regex("[A-Za-z0-9_-]{43}").matches(token)) { "Invalid server response" }
+            val expiresAt = json.getLong("expiresAt")
+            require(expiresAt > System.currentTimeMillis()) { "Expired server credential" }
             val credential = CloudflareAccessCredential(json.getString("clientId"),
                 json.getString("clientSecret"))
-            return Bundle(token, credential.clientId, credential.clientSecret)
+            return Bundle(token, credential.clientId, credential.clientSecret, expiresAt)
         } finally {
             connection.disconnect()
         }

@@ -21,7 +21,8 @@ class ProductionCredentialStore(
     context: Context,
     private val preferenceName: String = "production_installation_credential",
     private val alias: String = "apcida_production_installation_v1",
-    private val consentPreferenceName: String = "ai_protection_consent"
+    private val consentPreferenceName: String = "ai_protection_consent",
+    private val now: () -> Long = System::currentTimeMillis
 ) : ProductionCredentialSource {
     private val appContext = context.applicationContext
     private val preferences = appContext
@@ -44,23 +45,33 @@ class ProductionCredentialStore(
     fun hasStoredCredential(): Boolean =
         preferences.contains("data") || preferences.contains("iv")
 
+    /** The backend installation expires before its Cloudflare service token. */
+    fun expiresAtMillis(): Long? = preferences.getLong("expires_at", 0L).takeIf { it > 0L }
+
+    fun isExpired(): Boolean = expiresAtMillis()?.let { now() >= it } ?: false
+
     fun isQuarantinedForInference(): Boolean =
         quarantinedInProcess || preferences.getBoolean("inference_quarantined", false)
 
-    fun provision(token: String) {
+    fun provision(token: String, expiresAtMillis: Long? = null) {
         check(!contextRevocationPending()) { "Resolve pending remote deletion before re-enrollment" }
         check(!hasStoredCredential()) { "Resolve existing installation before enrollment" }
         require(Regex("[A-Za-z0-9_-]{43}").matches(token)) { "Invalid installation credential" }
+        require(expiresAtMillis == null || expiresAtMillis > now()) {
+            "Invalid installation expiry"
+        }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         val encrypted = cipher.doFinal(token.toByteArray(Charsets.US_ASCII))
         val encode = { bytes: ByteArray -> Base64.encodeToString(bytes, Base64.NO_WRAP) }
         check(preferences.edit().putString("iv", encode(cipher.iv))
-            .putString("data", encode(encrypted)).remove("inference_quarantined").commit()) { "Could not store installation credential" }
+            .putString("data", encode(encrypted)).remove("inference_quarantined")
+            .apply { if (expiresAtMillis != null) putLong("expires_at", expiresAtMillis)
+                else remove("expires_at") }.commit()) { "Could not store installation credential" }
         quarantinedInProcess = false
     }
 
     override fun get(): String? =
-        if (contextRevocationPending() || quarantinedInProcess ||
+        if (contextRevocationPending() || isExpired() || quarantinedInProcess ||
             preferences.getBoolean("inference_quarantined", false)) null
         else getForRevocation()
 
