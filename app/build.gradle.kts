@@ -39,6 +39,7 @@ android {
         buildConfigField("String", "REPORT_API_KEY", buildConfigString(""))
         buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(""))
         buildConfigField("String", "PRODUCTION_APPROVED_HOST", buildConfigString(productionApprovedHost))
+        buildConfigField("boolean", "INVITE_SETUP_ENABLED", "false")
     }
 
     buildTypes {
@@ -46,6 +47,7 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-eval"
             buildConfigField("String", "PILOT_APPROVED_HOST", buildConfigString(pilotApprovedHost))
+            buildConfigField("boolean", "INVITE_SETUP_ENABLED", "true")
         }
         release {
             buildConfigField("String", "PILOT_APPROVED_HOST", buildConfigString(""))
@@ -54,6 +56,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("beta") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta"
+            matchingFallbacks += listOf("release")
+            // This is an installable supervised test build, never a production signature.
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "INVITE_SETUP_ENABLED", "true")
         }
     }
 

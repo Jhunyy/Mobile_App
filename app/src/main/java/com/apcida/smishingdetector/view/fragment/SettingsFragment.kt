@@ -161,7 +161,7 @@ class SettingsFragment : Fragment() {
             }
         }
         protection.addView(deletionStatus)
-        if (BuildConfig.DEBUG || RemoteTransportGate.PRODUCTION_READY) {
+        if (BuildConfig.INVITE_SETUP_ENABLED || RemoteTransportGate.PRODUCTION_READY) {
             divider(protection)
             linkRow(protection, R.drawable.ic_safety, "Set up invite-only service",
                 "Use one private code for this phone. Setup does not enable automatic SMS analysis.") {
