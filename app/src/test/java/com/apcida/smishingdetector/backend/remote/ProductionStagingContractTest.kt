@@ -1,5 +1,6 @@
 package com.apcida.smishingdetector.backend.remote
 
+import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialSource
 import com.apcida.smishingdetector.backend.network.CloudflareAccessCredential
@@ -140,6 +141,6 @@ class ProductionStagingContractTest {
         assertTrue(transport(MemoryCredential(validToken), origin = "http://staging.apcida.invalid",
             sent = counting).analyze(candidate("SCAM")) is RemoteAnalysisReply.Failed)
         assertEquals(0, sent)
-        assertFalse(RemoteTransportGate.PRODUCTION_READY)
+        assertEquals(BuildConfig.REAL_SMS_PILOT_ENABLED, RemoteTransportGate.PRODUCTION_READY)
     }
 }

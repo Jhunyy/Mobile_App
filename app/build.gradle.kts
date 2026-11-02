@@ -23,6 +23,12 @@ val reportBaseUrl = System.getenv("APCIDA_REPORT_BASE_URL")
 val pilotApprovedHost = localProperties.getProperty("apcida.pilotApprovedHost") ?: ""
 // Empty until a separately approved stable HTTPS identity is provisioned. This is not a secret.
 val productionApprovedHost = localProperties.getProperty("apcida.productionApprovedHost") ?: ""
+// Only an explicitly requested beta build may enable the supervised SMS pilot.
+// Debug and release APKs stay closed even when this property is supplied.
+val realSmsPilotRequested = providers.gradleProperty("apcida.realSmsPilot").orNull == "true"
+require(!realSmsPilotRequested || productionApprovedHost == "sms.apcida.stream") {
+    "The supervised SMS pilot requires sms.apcida.stream as its approved host"
+}
 // Release signing secrets come only from the build environment, never Git or an APK.
 val releaseSigningNames = listOf("APCIDA_RELEASE_KEYSTORE_FILE", "APCIDA_RELEASE_STORE_PASSWORD",
     "APCIDA_RELEASE_KEY_ALIAS", "APCIDA_RELEASE_KEY_PASSWORD")
@@ -53,6 +59,7 @@ android {
         buildConfigField("String", "COMMUNITY_API_KEY", buildConfigString(""))
         buildConfigField("String", "PRODUCTION_APPROVED_HOST", buildConfigString(productionApprovedHost))
         buildConfigField("boolean", "INVITE_SETUP_ENABLED", "false")
+        buildConfigField("boolean", "REAL_SMS_PILOT_ENABLED", "false")
     }
 
     signingConfigs {
@@ -88,6 +95,7 @@ android {
             // This is an installable supervised test build, never a production signature.
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("boolean", "INVITE_SETUP_ENABLED", "true")
+            buildConfigField("boolean", "REAL_SMS_PILOT_ENABLED", realSmsPilotRequested.toString())
         }
     }
 

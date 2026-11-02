@@ -8,7 +8,7 @@ import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
 
-/** Production-only configuration. The gate remains closed in this build. */
+/** Approved-host and per-phone configuration for the supervised remote route. */
 internal object ProductionRemoteRuntime {
     fun requirements(context: Context,
                      consent: AiProtectionConsentStore.Snapshot): RemoteTransportGate.Requirements {

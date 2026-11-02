@@ -50,10 +50,10 @@ class ProductionSmsTransportTest {
         { requirements(endpoint).copy(approvedHost = host) }, gate, OkHttpClient.Builder().addInterceptor(handler)
             .followRedirects(false).followSslRedirects(false).build())
 
-    @Test fun defaultProductionGateAndInvalidOriginsSendNothing() = runBlocking {
+    @Test fun closedGateAndInvalidOriginsSendNothing() = runBlocking {
         var sent = 0
         val handler = Interceptor { chain -> sent++; response(chain, 200) }
-        val closed = transport(MemoryCredential(), handler, ProductionRemoteAuthorizationGate)
+        val closed = transport(MemoryCredential(), handler, RemoteAuthorizationGate { false })
         assertEquals(RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.SERVER_UNAVAILABLE),
             closed.analyze(candidate()))
         for (endpoint in listOf("http://sms.example.org", "https://other.example.org",

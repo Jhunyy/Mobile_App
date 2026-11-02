@@ -93,7 +93,7 @@ class SmsController(context: Context) {
         return IntakeResult(id, eligible)
     }
 
-    /** Atomic claim before any future remote request; duplicate work cannot analyze twice. */
+    /** Atomic claim before a remote request; duplicate work cannot analyze twice. */
     suspend fun claimRemoteAnalysis(messageId: Long, generation: Long): Boolean =
         repository.claimRemoteAnalysis(messageId, generation)
 
@@ -103,7 +103,7 @@ class SmsController(context: Context) {
     suspend fun markClaimedConsentDisabled(messageId: Long, generation: Long): Boolean =
         repository.disableClaimedRemoteAnalysis(messageId, generation)
 
-    /** Applies only a completed authenticated server verdict from a future secure transport. */
+    /** Applies only a completed authenticated server verdict. */
     suspend fun applyRemoteResult(messageId: Long, generation: Long, classification: String,
                                   confidence: String, rationale: String): Boolean {
         val remoteState = RemoteVerdictPolicy.stateFor(classification) ?: return false

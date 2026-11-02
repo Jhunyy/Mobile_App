@@ -1,10 +1,11 @@
 package com.apcida.smishingdetector.backend.network
 
+import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 
-/** Automatic real-SMS transport remains closed until rollout and every security prerequisite. */
+/** Only the explicitly enabled beta pilot may send after consent and every prerequisite. */
 object RemoteTransportGate {
-    const val PRODUCTION_READY = false
+    val PRODUCTION_READY: Boolean = BuildConfig.REAL_SMS_PILOT_ENABLED
 
     data class Requirements(
         val consent: AiProtectionConsentStore.Snapshot,

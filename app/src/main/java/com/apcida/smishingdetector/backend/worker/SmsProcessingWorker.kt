@@ -24,7 +24,7 @@ import com.apcida.smishingdetector.controller.SmsController
 import com.apcida.smishingdetector.model.data.ProcessingState
 import java.util.concurrent.TimeUnit
 
-/** Production route only. Consent and the closed gate are checked before every send. */
+/** Remote route. Consent and the build gate are checked before every send. */
 class SmsProcessingWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     companion object {
         internal const val ID = "message_id"

@@ -6,8 +6,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PreMeetupOutboundSafetyTest {
-    @Test fun automaticAiAndOptionalSmsSharingStayClosed() {
-        assertFalse(RemoteTransportGate.PRODUCTION_READY)
+    @Test fun onlyTheExplicitPilotCanOpenAutomaticAiAndOptionalSharingStaysClosed() {
+        assertEquals(BuildConfig.REAL_SMS_PILOT_ENABLED, RemoteTransportGate.PRODUCTION_READY)
         assertEquals("", BuildConfig.REPORT_API_KEY)
         assertEquals("", BuildConfig.COMMUNITY_API_KEY)
     }

@@ -1,5 +1,6 @@
 package com.apcida.smishingdetector.backend.phase3f
 
+import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.network.ProductionEndpointPolicy
 import com.apcida.smishingdetector.backend.network.RemoteTransportGate
@@ -29,15 +30,19 @@ class Phase3FSecurityGateTest {
         assertFalse(ProductionEndpointPolicy.isApprovedHttpsOrigin(ready.endpoint, null))
     }
 
-    @Test fun everyPrerequisiteIsRequiredAndRolloutRemainsOff() {
+    @Test fun everyPrerequisiteIsRequiredAndOnlyTheExplicitPilotMayOpen() {
         assertTrue(RemoteTransportGate.requirementsSatisfied(ready))
-        assertFalse(RemoteTransportGate.canTransmit(ready))
+        assertEquals(BuildConfig.REAL_SMS_PILOT_ENABLED, RemoteTransportGate.PRODUCTION_READY)
+        assertEquals(BuildConfig.REAL_SMS_PILOT_ENABLED, RemoteTransportGate.canTransmit(ready))
         assertFalse(RemoteTransportGate.requirementsSatisfied(ready.copy(
             consent = AiProtectionConsentStore.Snapshot(false, 0, 2))))
         assertFalse(RemoteTransportGate.requirementsSatisfied(ready.copy(hasPerInstallCredential = false)))
         assertFalse(RemoteTransportGate.requirementsSatisfied(ready.copy(serverIdentityValidated = false)))
         assertFalse(RemoteTransportGate.requirementsSatisfied(ready.copy(backgroundRequestsReady = false)))
         assertFalse(RemoteTransportGate.requirementsSatisfied(ready.copy(privacySafeErrorHandling = false)))
+        assertFalse(RemoteTransportGate.canTransmit(ready.copy(hasPerInstallCredential = false)))
+        assertFalse(RemoteTransportGate.canTransmit(ready.copy(consent =
+            AiProtectionConsentStore.Snapshot(false, 0, 2))))
         assertFalse(RemoteTransportGate.mayTransmit("https://apcida.example.org", true))
     }
 

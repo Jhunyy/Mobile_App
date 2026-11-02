@@ -80,7 +80,8 @@ class AutomaticRemoteCoordinatorTest {
         assertEquals(0, sent)
 
         val store = FakeState()
-        val closed = AutomaticRemoteCoordinator({ consent }, store, transport)
+        val closed = AutomaticRemoteCoordinator({ consent }, store, transport,
+            RemoteAuthorizationGate { false })
         assertEquals(AutomaticRemoteCoordinator.Outcome.GATE_CLOSED,
             closed.analyze(candidate(), requirements()))
         assertEquals("UNVERIFIED", store.localAssessment)
