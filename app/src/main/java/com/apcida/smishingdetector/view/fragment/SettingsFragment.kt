@@ -39,6 +39,7 @@ import com.apcida.smishingdetector.util.ContactNameResolver
 import com.apcida.smishingdetector.util.PermissionHelper
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import com.apcida.smishingdetector.backend.worker.ProductionRevocationWorker
+import com.apcida.smishingdetector.backend.worker.ProductionRenewalWorker
 import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -225,6 +226,7 @@ class SettingsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        ProductionRenewalWorker.scheduleIfConfigured(requireContext())
         if (::smsSwitch.isInitialized) refreshSwitches()
     }
 

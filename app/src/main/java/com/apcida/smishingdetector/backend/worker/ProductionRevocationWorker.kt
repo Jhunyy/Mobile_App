@@ -34,6 +34,7 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
                 (ProductionCredentialStore(app).hasStoredCredential() ||
                     CloudflareAccessCredentialStore(app).hasStoredCredential())
             if (!pending && !localCleanup) return
+            if (pending) ProductionRenewalWorker.cancel(app)
             if (pending && !serverConfirmed && !replace && consent.remoteDeletionStatus() in setOf(
                     AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED,
                     AiProtectionConsentStore.RemoteDeletionStatus.AUTH_REJECTED,

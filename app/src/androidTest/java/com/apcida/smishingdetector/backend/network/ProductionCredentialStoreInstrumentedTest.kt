@@ -15,6 +15,36 @@ import java.util.UUID
 /** Uses isolated test preferences and Keystore alias; never touches a provisioned credential. */
 @RunWith(AndroidJUnit4::class)
 class ProductionCredentialStoreInstrumentedTest {
+    @Test fun renewedExpirySurvivesRestartButCannotReviveAnExpiredPhone() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val suffix = UUID.randomUUID().toString()
+        val prefsName = "production_renewal_test_$suffix"
+        val alias = "apcida_production_renewal_test_$suffix"
+        val consentPrefsName = "production_renewal_consent_test_$suffix"
+        val token = "c".repeat(43)
+        var currentTime = 1_700_000_000_000L
+        try {
+            val first = ProductionCredentialStore(context, prefsName, alias, consentPrefsName,
+                now = { currentTime })
+            first.provision(token, currentTime + 4_000L)
+            first.extendExpiry(currentTime + 30_000L)
+            currentTime += 5_000L
+            val reopened = ProductionCredentialStore(context, prefsName, alias, consentPrefsName,
+                now = { currentTime })
+            assertEquals(token, reopened.get())
+            assertEquals(1_700_000_030_000L, reopened.expiresAtMillis())
+            currentTime += 30_000L
+            assertNull(reopened.get())
+            try { reopened.extendExpiry(currentTime + 30_000L); fail("Expired token revived") }
+            catch (_: IllegalArgumentException) { }
+            assertEquals(token, reopened.getForRevocation())
+        } finally {
+            context.getSharedPreferences(prefsName, 0).edit().clear().commit()
+            context.getSharedPreferences(consentPrefsName, 0).edit().clear().commit()
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+        }
+    }
+
     @Test fun expiredCredentialBlocksAnalysisButRemainsAvailableForDeletion() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val suffix = UUID.randomUUID().toString()

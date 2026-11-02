@@ -50,6 +50,16 @@ class ProductionCredentialStore(
 
     fun isExpired(): Boolean = expiresAtMillis()?.let { now() >= it } ?: false
 
+    /** Renewal changes the expiry only; the phone keeps the same encrypted bearer. */
+    fun extendExpiry(expiresAtMillis: Long) {
+        check(hasStoredCredential() && !contextRevocationPending()) { "No active credential to renew" }
+        val current = expiresAtMillis() ?: error("Credential expiry is missing")
+        require(current > now() && expiresAtMillis > current) { "Invalid renewed expiry" }
+        check(preferences.edit().putLong("expires_at", expiresAtMillis).commit()) {
+            "Could not save renewed credential expiry"
+        }
+    }
+
     fun isQuarantinedForInference(): Boolean =
         quarantinedInProcess || preferences.getBoolean("inference_quarantined", false)
 

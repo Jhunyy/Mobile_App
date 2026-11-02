@@ -23,6 +23,19 @@ val reportBaseUrl = System.getenv("APCIDA_REPORT_BASE_URL")
 val pilotApprovedHost = localProperties.getProperty("apcida.pilotApprovedHost") ?: ""
 // Empty until a separately approved stable HTTPS identity is provisioned. This is not a secret.
 val productionApprovedHost = localProperties.getProperty("apcida.productionApprovedHost") ?: ""
+// Release signing secrets come only from the build environment, never Git or an APK.
+val releaseSigningNames = listOf("APCIDA_RELEASE_KEYSTORE_FILE", "APCIDA_RELEASE_STORE_PASSWORD",
+    "APCIDA_RELEASE_KEY_ALIAS", "APCIDA_RELEASE_KEY_PASSWORD")
+val releaseSigningValues = releaseSigningNames.associateWith { System.getenv(it).orEmpty() }
+val releaseSigningConfigured = releaseSigningValues.values.all(String::isNotBlank)
+require(releaseSigningValues.values.none(String::isNotBlank) || releaseSigningConfigured) {
+    "Release signing environment is incomplete"
+}
+require(!releaseSigningConfigured ||
+    (productionApprovedHost.matches(Regex("[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")) &&
+        !productionApprovedHost.endsWith(".trycloudflare.com", ignoreCase = true))) {
+    "A stable production-approved host is required for a signed release"
+}
 
 android {
     namespace = "com.apcida.smishingdetector"
@@ -42,6 +55,15 @@ android {
         buildConfigField("boolean", "INVITE_SETUP_ENABLED", "false")
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) create("apcidaRelease") {
+            storeFile = file(releaseSigningValues.getValue("APCIDA_RELEASE_KEYSTORE_FILE"))
+            storePassword = releaseSigningValues.getValue("APCIDA_RELEASE_STORE_PASSWORD")
+            keyAlias = releaseSigningValues.getValue("APCIDA_RELEASE_KEY_ALIAS")
+            keyPassword = releaseSigningValues.getValue("APCIDA_RELEASE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -50,6 +72,7 @@ android {
             buildConfigField("boolean", "INVITE_SETUP_ENABLED", "true")
         }
         release {
+            if (releaseSigningConfigured) signingConfig = signingConfigs.getByName("apcidaRelease")
             buildConfigField("String", "PILOT_APPROVED_HOST", buildConfigString(""))
             isMinifyEnabled = false
             proguardFiles(

@@ -7,6 +7,7 @@ import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSou
 import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionRevocationClient
+import com.apcida.smishingdetector.backend.worker.ProductionRenewalWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -37,6 +38,7 @@ internal class InviteEnrollmentService(context: Context) {
                 try {
                     backend.provision(bundle.installationToken, bundle.expiresAt)
                     access.provision(bundle.clientId, bundle.clientSecret)
+                    runCatching { ProductionRenewalWorker.scheduleIfConfigured(app) }
                     return@withLock Result.SET_UP
                 } catch (_: Exception) {
                     // A redeemed invite has created a server installation. Attempt to
