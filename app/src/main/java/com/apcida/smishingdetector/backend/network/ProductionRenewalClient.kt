@@ -3,10 +3,10 @@ package com.apcida.smishingdetector.backend.network
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.google.gson.JsonParser
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -33,7 +33,8 @@ internal class ProductionRenewalClient(
         try {
             http.executeCancellable(request) { response ->
                 if (response.code != 200) return@executeCancellable null
-                val value = JSONObject(response.body?.string() ?: "").optLong("expiresAt", 0L)
+                val value = JsonParser().parse(response.body?.string() ?: "")
+                    .asJsonObject.get("expiresAt")?.asLong ?: 0L
                 value.takeIf { it > 0L }
             }
         } catch (cancelled: CancellationException) {
