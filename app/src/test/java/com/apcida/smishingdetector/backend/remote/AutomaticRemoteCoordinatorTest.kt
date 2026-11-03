@@ -94,6 +94,29 @@ class AutomaticRemoteCoordinatorTest {
         assertEquals(0, sent)
     }
 
+    @Test fun olderSmsNeedsExplicitBatchAndCurrentConsentAtEveryStep() = runBlocking {
+        val old = RemoteSmsCandidate(52, "Synthetic", "Old invented message", 500,
+            "stable-request-52", 2, true, "batch-1")
+        var allowed = false
+        var calls = 0
+        val store = FakeState()
+        val coordinator = AutomaticRemoteCoordinator({ enabled }, store,
+            RemoteAnalysisTransport {
+                calls++
+                allowed = false // A stopped batch cannot commit a late response.
+                RemoteAnalysisReply.Verified("SAFE", "HIGH", "Synthetic rationale")
+            }, reviewedTestGate, { allowed && it.manualBatchId == "batch-1" })
+        assertEquals(AutomaticRemoteCoordinator.Outcome.INELIGIBLE,
+            coordinator.analyze(old, requirements()))
+        assertEquals(0, calls)
+        allowed = true
+        assertEquals(AutomaticRemoteCoordinator.Outcome.CONSENT_REVOKED,
+            coordinator.analyze(old, requirements()))
+        assertEquals(1, calls)
+        assertEquals(0, store.completed)
+        assertEquals(1, store.disabled)
+    }
+
     @Test fun successfulVerdictsCommitOnceAndCannotDuplicateNotifications() = runBlocking {
         for (classification in listOf("SCAM", "SAFE", "SUSPICIOUS")) {
             val store = FakeState()

@@ -36,9 +36,14 @@ class SmsProcessingWorker(appContext: Context, params: WorkerParameters) : Corou
             val app = context.applicationContext
             val dao = AppDatabase.getInstance(app).messageDao()
             val controller = SmsController(app)
-            val stale = dao.getStaleAiMessageIds(System.currentTimeMillis() - ProductionTiming.ORPHAN_STALE_MS)
-            stale.forEach { controller.markAiUnavailable(it) }
             val consent = AiProtectionConsentStore(app).snapshot()
+            if (HistoricalSmsBatchStore(app).active() == null) {
+                dao.getPendingHistoricalMessageIds(consent.grantedAt)
+                    .forEach { controller.markAiUnavailable(it) }
+            }
+            val stale = dao.getStaleAiMessageIds(System.currentTimeMillis() - ProductionTiming.ORPHAN_STALE_MS,
+                consent.grantedAt)
+            stale.forEach { controller.markAiUnavailable(it) }
             if (!consent.enabled) return
             dao.getQueuedRemoteMessageIds(consent.generation, consent.grantedAt)
                 .forEach { enqueue(app, it) }

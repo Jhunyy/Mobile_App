@@ -36,6 +36,7 @@ internal class ProductionSmsTransport(
         .readTimeout(ProductionTiming.READ_SECONDS, TimeUnit.SECONDS)
         .callTimeout(ProductionTiming.CALL_SECONDS, TimeUnit.SECONDS).followRedirects(false)
         .followSslRedirects(false).build(),
+    private val manualHistoricalAuthorization: (RemoteSmsCandidate) -> Boolean = { false },
 ) : RemoteAnalysisTransport {
     override suspend fun analyze(candidate: RemoteSmsCandidate): RemoteAnalysisReply = withContext(Dispatchers.IO) {
         val current = requirements()
@@ -43,7 +44,8 @@ internal class ProductionSmsTransport(
             current.approvedHost != approvedHost ||
             current.consent.generation != candidate.consentGeneration ||
             !AutomaticAnalysisPolicy.eligible(current.consent, candidate.receivedAt,
-                candidate.historicalImport, true) ||
+                candidate.historicalImport, true,
+                candidate.manualBatchId != null && manualHistoricalAuthorization(candidate)) ||
             !ProductionEndpointPolicy.isApprovedHttpsOrigin(origin, approvedHost) ||
             URI(origin).host.endsWith(".trycloudflare.com", ignoreCase = true)) {
             return@withContext RemoteAnalysisReply.Failed(RemoteAnalysisReply.Failure.SERVER_UNAVAILABLE)

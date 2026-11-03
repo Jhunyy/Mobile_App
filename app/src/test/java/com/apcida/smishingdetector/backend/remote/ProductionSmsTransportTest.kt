@@ -45,10 +45,11 @@ class ProductionSmsTransportTest {
     private fun transport(credential: MemoryCredential, handler: Interceptor,
         gate: RemoteAuthorizationGate = reviewedTestGate, host: String = "sms.example.org",
         endpoint: String = origin,
-        access: CloudflareAccessCredentialSource = accessSource) = ProductionSmsTransport(endpoint, host,
+        access: CloudflareAccessCredentialSource = accessSource,
+        manualAuthorization: (RemoteSmsCandidate) -> Boolean = { false }) = ProductionSmsTransport(endpoint, host,
         credential, access,
         { requirements(endpoint).copy(approvedHost = host) }, gate, OkHttpClient.Builder().addInterceptor(handler)
-            .followRedirects(false).followSslRedirects(false).build())
+            .followRedirects(false).followSslRedirects(false).build(), manualAuthorization)
 
     @Test fun closedGateAndInvalidOriginsSendNothing() = runBlocking {
         var sent = 0
@@ -102,6 +103,26 @@ class ProductionSmsTransportTest {
         assertEquals("SCAM", result.classification)
         assertEquals(1, sent)
         assertFalse(candidate().toString().contains("do not share"))
+    }
+
+    @Test fun olderSmsNeedsBatchAuthorizationBeforeNetworkRequest() = runBlocking {
+        var calls = 0
+        val old = RemoteSmsCandidate(43, "Synthetic", "Old invented reminder", 500, id,
+            2, true, "batch-1")
+        var active = false
+        val item = transport(MemoryCredential(), Interceptor { chain ->
+            calls++
+            response(chain, 200,
+                """{"messageId":"$id","classification":"SAFE","confidence":"HIGH","rationale":"Mock reminder"}""")
+        }, manualAuthorization = { active && it.manualBatchId == "batch-1" && it.messageId == 43L })
+        assertTrue(item.analyze(old) is RemoteAnalysisReply.Failed)
+        assertEquals(0, calls)
+        active = true
+        assertTrue(item.analyze(old) is RemoteAnalysisReply.Verified)
+        assertEquals(1, calls)
+        active = false
+        assertTrue(item.analyze(old) is RemoteAnalysisReply.Failed)
+        assertEquals(1, calls)
     }
 
     @Test fun rejectionTimeoutOfflineAndBadResponseFailClosed() = runBlocking {

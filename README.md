@@ -1,6 +1,10 @@
 # KA-SDS: Keyword-Augmented Smishing Detection System
 
-> **Current Phase 3E status (October 2026):** Incoming SMS now receives offline keyword-rule screening. On-device Gemma is no longer called by the production SMS path. Remote Gemma 3 12B + RAG is the target primary classifier, but automatic real-SMS transmission is **disabled** until production HTTPS, per-install authentication, and server identity validation are complete. A zero-rule message is shown as **UNVERIFIED**, not SAFE. Consent is opt-in and revocable. See [PHASE3E_CORE_AI_IMPLEMENTATION.md](PHASE3E_CORE_AI_IMPLEMENTATION.md) for current behavior and build commands. The detector description below documents the earlier on-device prototype and is retained for historical evaluation context.
+## Supervised beta: older SMS analysis
+
+In an explicitly enabled beta build, **Messages → More → Analyze up to 3 older SMS with AI** previews the next three locally screened SMS from before the current AI Protection consent. The confirmation explains that the full text, sender, and date of just those messages will be sent to the private server. The app processes them one at a time and shows progress above the inbox. **More → Stop older SMS analysis** stops the remaining work. To check more older messages, start another batch and confirm it separately. This action requires AI Protection consent, an enrolled phone, and network access. It does not change the automatic handling of new SMS or add messages to RAG.
+
+> **Current supervised beta (November 2026):** Incoming SMS receives local keyword screening. An explicitly enabled beta build can send new SMS to remote Gemma 3 12B + RAG after per-phone enrollment and AI Protection consent. Ordinary debug and release builds keep this route closed. Older SMS remain local unless the user approves a separate small batch below. A zero-rule message without a completed remote result is **UNVERIFIED**, not SAFE. The detector description below documents the earlier on-device prototype and is retained for historical evaluation context.
 
 Android application for detecting SMS phishing ("smishing") messages using a two-stage pipeline: on-device keyword/pattern analysis, followed by contextual validation from an on-device LLM (Gemma). Built as an undergraduate thesis project.
 

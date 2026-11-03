@@ -58,6 +58,36 @@ interface MessageDao {
     @Query("SELECT message_id FROM messages WHERE processing_state = 'AI_QUEUED' AND detection_state = 'REMOTE_PENDING' AND verdict_source = 'LOCAL_RULES' AND consent_generation = :generation AND received_at >= :grantedAt")
     suspend fun getQueuedRemoteMessageIds(generation: Long, grantedAt: Long): List<Long>
 
+    @Query("SELECT message_id FROM messages WHERE received_at < :grantedAt AND verdict_source = 'LOCAL_RULES' AND processing_state IN ('AI_QUEUED', 'AI_ANALYZING')")
+    suspend fun getPendingHistoricalMessageIds(grantedAt: Long): List<Long>
+
+    /** Only local-only SMS from before the current consent; never select new pending work. */
+    @Query("""
+        SELECT message_id FROM messages
+        WHERE received_at < :grantedAt AND verdict_source = 'LOCAL_RULES'
+          AND processing_state IN ('REMOTE_CONSENT_DISABLED', 'REMOTE_UNAVAILABLE')
+          AND ai_analysis_status != 'AVAILABLE'
+          AND length(trim(content)) BETWEEN 1 AND 2000
+          AND length(coalesce(sender_address, 'Unknown')) <= 100
+          AND remote_request_id IS NOT NULL
+        ORDER BY received_at DESC, message_id DESC LIMIT :limit
+    """)
+    suspend fun getHistoricalBatchCandidates(grantedAt: Long, limit: Int): List<Long>
+
+    /** Queue a single explicitly selected older SMS immediately before its network request. */
+    @Query("""
+        UPDATE messages SET processing_state = 'AI_QUEUED', detection_state = 'REMOTE_PENDING',
+            ai_analysis_status = 'NOT_STARTED', consent_generation = :generation
+        WHERE message_id = :messageId AND received_at < :grantedAt
+          AND verdict_source = 'LOCAL_RULES'
+          AND processing_state IN ('REMOTE_CONSENT_DISABLED', 'REMOTE_UNAVAILABLE')
+          AND ai_analysis_status != 'AVAILABLE'
+          AND length(trim(content)) BETWEEN 1 AND 2000
+          AND length(coalesce(sender_address, 'Unknown')) <= 100
+          AND remote_request_id IS NOT NULL
+    """)
+    suspend fun queueHistoricalAnalysis(messageId: Long, generation: Long, grantedAt: Long): Int
+
     /** Fail only a still-pending row; never overwrite a completed remote verdict. */
     @Query("""
         UPDATE messages SET processing_state = 'REMOTE_UNAVAILABLE',
@@ -125,8 +155,8 @@ interface MessageDao {
     """)
     suspend fun disableClaimedRemoteAnalysis(messageId: Long, generation: Long): Int
 
-    @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before AND verdict_source = 'LOCAL_RULES' AND consent_generation > 0")
-    suspend fun getStaleAiMessageIds(before: Long): List<Long>
+    @Query("SELECT message_id FROM messages WHERE processing_state IN ('AI_QUEUED', 'AI_ANALYZING') AND created_at < :before AND verdict_source = 'LOCAL_RULES' AND consent_generation > 0 AND received_at >= :grantedAt")
+    suspend fun getStaleAiMessageIds(before: Long, grantedAt: Long): List<Long>
 
     @Query(
         """

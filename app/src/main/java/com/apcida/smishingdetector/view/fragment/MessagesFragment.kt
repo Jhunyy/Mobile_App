@@ -23,8 +23,13 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.apcida.smishingdetector.R
+import com.apcida.smishingdetector.BuildConfig
+import com.apcida.smishingdetector.backend.consent.AiProtectionConsentStore
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.backend.remote.ProductionRemoteRuntime
 import com.apcida.smishingdetector.backend.repository.MessageRepository
+import com.apcida.smishingdetector.backend.worker.HistoricalSmsBatchStore
+import com.apcida.smishingdetector.backend.worker.HistoricalSmsBatchWorker
 import com.apcida.smishingdetector.backend.worker.SmsInboxSyncWorker
 import com.apcida.smishingdetector.databinding.FragmentMessagesBinding
 import com.apcida.smishingdetector.model.entity.Message
@@ -38,6 +43,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 
 class MessagesFragment : Fragment() {
 
@@ -90,6 +97,7 @@ class MessagesFragment : Fragment() {
         setupInboxControls()
         observeMessages()
         observeInboxSync()
+        observeHistoricalBatch()
         setupPullToRefresh()
         offerContactNamesOnce()
     }
@@ -223,9 +231,114 @@ class MessagesFragment : Fragment() {
                     adapter.notifyDataSetChanged()
                     true
                 }
+                if (BuildConfig.REAL_SMS_PILOT_ENABLED) {
+                    val active = HistoricalSmsBatchStore(requireContext()).active()
+                    menu.add(if (active == null) "Analyze up to 3 older SMS with AI"
+                        else "Stop older SMS analysis").setOnMenuItemClickListener {
+                        if (active == null) prepareHistoricalBatch() else stopHistoricalBatch(active)
+                        true
+                    }
+                }
                 show()
             }
         }
+    }
+
+    private fun prepareHistoricalBatch() {
+        val app = requireContext().applicationContext
+        val consent = AiProtectionConsentStore(app).snapshot()
+        if (!consent.enabled || !ProductionRemoteRuntime.canSchedule(app, consent)) {
+            Toast.makeText(requireContext(), "Turn on AI Protection and set up this phone first.",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        if (syncInProgress) {
+            Toast.makeText(requireContext(), "Wait for the inbox scan to finish.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val dao = AppDatabase.getInstance(app).messageDao()
+            if (HistoricalSmsBatchStore(app).active() == null) {
+                dao.getPendingHistoricalMessageIds(consent.grantedAt)
+                    .forEach { id -> dao.failPendingRemoteAnalysis(id,
+                        dao.getMessageById(id)?.consentGeneration ?: 0) }
+            }
+            val ids = dao.getHistoricalBatchCandidates(consent.grantedAt, 3)
+            val messages = ids.mapNotNull { dao.getMessageById(it) }
+            if (messages.isEmpty()) {
+                Toast.makeText(requireContext(), "No older messages need AI analysis.",
+                    Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+            val previews = messages.mapIndexed { index, message ->
+                val preview = message.content.replace('\n', ' ').take(120)
+                "${index + 1}. ${message.senderAddress ?: "Unknown"} · " +
+                    "${dateFormat.format(Date(message.receivedAt))}\n$preview" +
+                    if (message.content.length > 120) "…" else ""
+            }.joinToString("\n\n")
+            AlertDialog.Builder(requireContext())
+                .setTitle("Analyze these ${messages.size} older messages?")
+                .setMessage("ApCiDa will send the full SMS text, sender and date of each message " +
+                    "shown below to your private AI server. Only this batch is authorized. " +
+                    "It will process one at a time, up to three. You can stop it from this menu.\n\n$previews")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Analyze these messages") { _, _ ->
+                    val current = AiProtectionConsentStore(app).snapshot()
+                    if (!current.enabled || current.generation != consent.generation ||
+                        !ProductionRemoteRuntime.canSchedule(app, current)) {
+                        Toast.makeText(requireContext(), "AI Protection changed. Try again.",
+                            Toast.LENGTH_SHORT).show()
+                    } else {
+                        val batch = HistoricalSmsBatchStore(app).start(messages.map { it.messageId },
+                            current.generation)
+                        if (batch == null) {
+                            Toast.makeText(requireContext(), "An older-message batch is already running.",
+                                Toast.LENGTH_SHORT).show()
+                        } else HistoricalSmsBatchWorker.enqueue(app, batch.id)
+                    }
+                }.show()
+        }
+    }
+
+    private fun stopHistoricalBatch(batch: HistoricalSmsBatchStore.Batch) {
+        val app = requireContext().applicationContext
+        if (HistoricalSmsBatchStore(app).clear(batch.id) == null) return
+        WorkManager.getInstance(app).cancelUniqueWork(HistoricalSmsBatchWorker.WORK_NAME)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val dao = AppDatabase.getInstance(app).messageDao()
+            batch.messageIds.forEach { dao.failPendingRemoteAnalysis(it, batch.generation) }
+        }
+        Toast.makeText(requireContext(), "Older-message batch stopped.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun observeHistoricalBatch() {
+        if (!BuildConfig.REAL_SMS_PILOT_ENABLED) return
+        WorkManager.getInstance(requireContext())
+            .getWorkInfosForUniqueWorkLiveData(HistoricalSmsBatchWorker.WORK_NAME)
+            .observe(viewLifecycleOwner) { infos ->
+                if (_binding == null) return@observe
+                val info = infos?.lastOrNull()
+                val active = HistoricalSmsBatchStore(requireContext()).active()
+                val label = when {
+                    active != null -> {
+                        val done = info?.progress?.getInt(HistoricalSmsBatchWorker.DONE, 0) ?: 0
+                        "Older SMS AI analysis: $done of ${active.messageIds.size} finished. " +
+                            "Use More to stop the batch."
+                    }
+                    info?.state == WorkInfo.State.SUCCEEDED -> {
+                        val done = info.outputData.getInt(HistoricalSmsBatchWorker.DONE, 0)
+                        val verified = info.outputData.getInt(HistoricalSmsBatchWorker.VERIFIED, 0)
+                        "Older SMS AI analysis finished: $verified verified of $done attempted. " +
+                            "Check each message for its result."
+                    }
+                    info?.state == WorkInfo.State.CANCELLED -> "Older SMS AI analysis stopped."
+                    info?.state == WorkInfo.State.FAILED -> "Older SMS AI analysis could not finish."
+                    else -> null
+                }
+                binding.textHistoricalBatchStatus.text = label
+                binding.textHistoricalBatchStatus.visibility = if (label == null) View.GONE else View.VISIBLE
+            }
     }
 
     private fun observeMessages() {

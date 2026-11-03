@@ -159,6 +159,18 @@
             app:tint="@color/inbox_text" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/text_historical_batch_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="8dp"
+        android:fontFamily="@font/dm_sans_regular"
+        android:textColor="@color/inbox_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

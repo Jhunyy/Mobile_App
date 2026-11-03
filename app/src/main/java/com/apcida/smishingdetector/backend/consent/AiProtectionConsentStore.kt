@@ -5,6 +5,7 @@ import androidx.work.WorkManager
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.worker.ProductionRevocationWorker
+import com.apcida.smishingdetector.backend.worker.HistoricalSmsBatchStore
 
 /** Remote analysis is opt-in. Android SMS permission and research participation are independent. */
 class AiProtectionConsentStore(
@@ -68,6 +69,7 @@ class AiProtectionConsentStore(
             .putLong("generation", generation).putBoolean("remote_deletion_pending", pending)
             .putString("remote_deletion_status", if (pending) RemoteDeletionStatus.PENDING.name
                 else RemoteDeletionStatus.NOT_REQUIRED.name).commit())
+        HistoricalSmsBatchStore(app).stored()?.let { HistoricalSmsBatchStore(app).clear(it.id) }
         runCatching { WorkManager.getInstance(app).cancelAllWorkByTag(AUTO_REMOTE_TAG) }
         if (pending) {
             runCatching { enqueueDeletion(app) }

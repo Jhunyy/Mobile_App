@@ -15,6 +15,7 @@ class RemoteSmsCandidate(
     val requestId: String,
     val consentGeneration: Long,
     val historicalImport: Boolean,
+    val manualBatchId: String? = null,
 ) {
     init {
         require(messageId > 0 && text.isNotBlank() && requestId.isNotBlank())
@@ -62,6 +63,7 @@ class AutomaticRemoteCoordinator(
     private val state: RemoteAnalysisStateStore,
     private val transport: RemoteAnalysisTransport,
     private val gate: RemoteAuthorizationGate = ProductionRemoteAuthorizationGate,
+    private val manualHistoricalAuthorization: (RemoteSmsCandidate) -> Boolean = { false },
 ) {
     enum class Outcome { INELIGIBLE, GATE_CLOSED, ALREADY_HANDLED, CONSENT_REVOKED,
                          VERIFIED, UNAVAILABLE, CREDENTIAL_REVOKED }
@@ -70,7 +72,8 @@ class AutomaticRemoteCoordinator(
                               snapshot: AiProtectionConsentStore.Snapshot): Boolean =
         candidate.consentGeneration == snapshot.generation &&
             AutomaticAnalysisPolicy.eligible(snapshot, candidate.receivedAt,
-                candidate.historicalImport, true)
+                candidate.historicalImport, true,
+                candidate.manualBatchId != null && manualHistoricalAuthorization(candidate))
 
     suspend fun analyze(candidate: RemoteSmsCandidate,
                         requirements: RemoteTransportGate.Requirements): Outcome {
