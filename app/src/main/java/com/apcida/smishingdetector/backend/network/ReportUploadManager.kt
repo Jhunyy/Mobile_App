@@ -30,13 +30,25 @@ class ReportUploadManager(private val context: Context) {
             ReportUploadEligibility.isEligible(app, it.reportedAt)
         }
         if (pending.isEmpty()) return@withContext true
-        if (!isInternetAvailable()) return@withContext false
+        if (!isInternetAvailable()) {
+            Log.w(TAG, "Report upload waiting: no internet connection.")
+            return@withContext false
+        }
         val host = BuildConfig.PRODUCTION_APPROVED_HOST
         val origin = "https://$host"
         if (!ProductionEndpointPolicy.isApprovedHttpsOrigin(origin, host) ||
-            host.endsWith(".trycloudflare.com", ignoreCase = true)) return@withContext false
-        val backend = ProductionCredentialStore(app).get() ?: return@withContext false
-        val access = CloudflareAccessCredentialStore(app).get() ?: return@withContext false
+            host.endsWith(".trycloudflare.com", ignoreCase = true)) {
+            Log.w(TAG, "Report upload waiting: approved host unavailable.")
+            return@withContext false
+        }
+        val backend = ProductionCredentialStore(app).get() ?: run {
+            Log.w(TAG, "Report upload waiting: installation credential unavailable.")
+            return@withContext false
+        }
+        val access = CloudflareAccessCredentialStore(app).get() ?: run {
+            Log.w(TAG, "Report upload waiting: Access credential unavailable.")
+            return@withContext false
+        }
         val api = Retrofit.Builder().baseUrl("$origin/")
             .client(OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(25, TimeUnit.SECONDS).callTimeout(35, TimeUnit.SECONDS)
@@ -54,7 +66,10 @@ class ReportUploadManager(private val context: Context) {
     ) {
         val id = report.clientReportId?.takeIf {
             runCatching { UUID.fromString(it) }.isSuccess
-        } ?: return // Old local reports without a durable UUID stay local.
+        } ?: run {
+            Log.w(TAG, "Report upload skipped: local report has no durable ID.")
+            return // Old local reports without a durable UUID stay local.
+        }
         val sms = report.smsTextSnapshot?.takeIf { it.isNotEmpty() && it.length <= 4000 }
         val payload = ReportPayload(
             clientReportId = id,

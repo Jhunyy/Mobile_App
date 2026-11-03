@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.apcida.smishingdetector.backend.database.AppDatabase
+import com.apcida.smishingdetector.backend.network.ReportUploadManager
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.backend.worker.ReportUploadWorker
 import com.apcida.smishingdetector.databinding.FragmentReportLogsBinding
@@ -80,9 +81,13 @@ class ReportLogsFragment : Fragment() {
             val layout = pullToRefresh
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    ReportUploadWorker.enqueue(requireContext().applicationContext)
+                    val uploaded = ReportUploadManager(requireContext().applicationContext)
+                        .uploadPendingReports()
+                    if (!uploaded) ReportUploadWorker.enqueue(requireContext().applicationContext)
                     renderReports(reportRepository.getAllReports().first())
-                    Toast.makeText(requireContext(), "Reports refreshed.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(),
+                        if (uploaded) "Reports refreshed." else "Still pending; will retry automatically.",
+                        Toast.LENGTH_SHORT).show()
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
