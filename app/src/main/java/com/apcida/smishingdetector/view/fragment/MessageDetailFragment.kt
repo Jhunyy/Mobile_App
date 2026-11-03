@@ -378,7 +378,7 @@ class MessageDetailFragment : Fragment() {
 
             Toast.makeText(
                 requireContext(),
-                "Report saved on this device. Sharing is unavailable in this build.",
+                "Report saved. Check Reports for its upload status.",
                 Toast.LENGTH_SHORT
             ).show()
         }

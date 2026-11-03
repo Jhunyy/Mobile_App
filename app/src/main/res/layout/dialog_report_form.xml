@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fontFamily="@font/dm_sans_regular"
-        android:text="Tell us if the scan did not finish or its result seems wrong."
+        android:text="Tell us if the scan did not finish or its result seems wrong. Your report type and optional remarks are queued for private review when this phone has service access. SMS text is sent only if you check the box below. Server copies are kept for about 30 days; the local copy stays on this phone until you remove it. Reports are not added to the AI examples automatically."
         android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
@@ -76,7 +76,7 @@
         android:hint="What result did you expect?"
         android:inputType="textCapSentences|textMultiLine"
         android:maxLines="5"
-        android:maxLength="1000"
+        android:maxLength="500"
         android:padding="16dp"
         android:textColor="@color/text_primary"
         android:textColorHint="@color/text_secondary"

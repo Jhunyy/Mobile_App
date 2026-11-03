@@ -8,6 +8,7 @@ import com.apcida.smishingdetector.backend.network.CloudflareAccessCredentialSto
 import com.apcida.smishingdetector.backend.network.ProductionCredentialStore
 import com.apcida.smishingdetector.backend.network.ProductionRevocationClient
 import com.apcida.smishingdetector.backend.worker.ProductionRenewalWorker
+import com.apcida.smishingdetector.backend.reporting.ReportUploadEligibility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -38,6 +39,7 @@ internal class InviteEnrollmentService(context: Context) {
                 try {
                     backend.provision(bundle.installationToken, bundle.expiresAt)
                     access.provision(bundle.clientId, bundle.clientSecret)
+                    ReportUploadEligibility.beginNewEnrollment(app)
                     runCatching { ProductionRenewalWorker.scheduleIfConfigured(app) }
                     return@withLock Result.SET_UP
                 } catch (_: Exception) {

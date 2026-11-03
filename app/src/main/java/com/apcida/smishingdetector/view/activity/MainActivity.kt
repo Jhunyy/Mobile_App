@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         showConsentOnboardingIfNeeded()
         recoverOrphanedAiWork()
         ProductionRevocationWorker.enqueueIfPending(applicationContext)
+        com.apcida.smishingdetector.backend.reporting.ReportUploadEligibility.initialize(applicationContext)
         ReportUploadWorker.enqueue(applicationContext)
         requestRequiredPermissions()
     }

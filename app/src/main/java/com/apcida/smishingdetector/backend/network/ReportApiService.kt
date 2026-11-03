@@ -1,53 +1,33 @@
 package com.apcida.smishingdetector.backend.network
 
-import com.apcida.smishingdetector.util.Constants
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
 
-/**
- * Retrofit interface for submitting feedback and a scan snapshot.
- * SMS text is sent only when the user opts in.
- */
+/** Feedback uses the same private installation and Cloudflare credentials as remote analysis. */
 interface ReportApiService {
-
-    @POST(Constants.REPORT_ENDPOINT)
+    @POST("api/v1/reports")
     suspend fun submitReport(
-        @Header(Constants.REPORT_API_KEY_HEADER) apiKey: String,
-        @Header(Constants.REPORT_TIMESTAMP_HEADER) timestamp: Long,
+        @Header("Authorization") authorization: String,
+        @Header("CF-Access-Client-Id") clientId: String,
+        @Header("CF-Access-Client-Secret") clientSecret: String,
         @Body report: ReportPayload
     ): Response<ReportResponse>
 }
 
-/**
- * Submission-time scan snapshot and optional user-approved SMS text.
- */
+/** No sender, rationale, indicators, or SMS body unless sharing was checked. */
 data class ReportPayload(
+    val clientReportId: String,
     val reportType: String,
     val remarks: String?,
-    val riskScore: Float?,
-    val gemmaClassification: String?,
-    val gemmaRationale: String?,
-    val detectedKeywords: List<String>,
-    val reportedAt: Long,
-    val appVersion: String,
-    val clientReportId: String?,
-    val finalVerdict: String?,
-    val ruleVerdict: String?,
-    val processingState: String?,
-    val aiStatus: String?,
-    val gemmaConfidence: String?,
-    val modelVersion: String?,
     val smsText: String?,
-    val messageSharingConsent: Boolean?
+    val messageSharingConsent: Boolean,
+    val observedVerdict: String?,
+    val riskScore: Float?,
 )
 
-/**
- * Server response after report submission.
- */
 data class ReportResponse(
-    val success: Boolean,
-    val message: String?,
-    val reportId: String?
+    val reportId: String?,
+    val status: String?
 )

@@ -177,39 +177,17 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 ## Notes
 
 - Keyword scores determine preliminary risk: 0–29 SAFE, 30–59 SUSPICIOUS, 60+ SCAM. Every score proceeds to Gemma.
-- The reporting API sends anonymized metadata; it does not upload SMS content, sender addresses, or contact names.
+- The report upload sends the selected issue, optional remarks, observed verdict, and rule score. SMS text is uploaded only when the reporter explicitly checks its box. Sender addresses and contact names are not uploaded.
 - New messages store the sender address locally so it can be shown in the inbox and detail screen. Existing messages keep "Unknown Sender" because their saved hashes cannot recover the address.
 - Contact names are optional. The inbox offers contact access once and keeps a Show/Hide contact names menu option. The app looks up only saved SMS sender numbers and does not save or upload contact names. Unknown numbers and alphanumeric sender IDs display as received. Contact membership does not change either numeric score; the existing final-verdict policy uses it only under strict conditions.
 
-## Report Server Plan
+## Private report submission
 
-Report collection is handled by a separate server, not by the Android app itself. Reporting is optional feedback for a saved message that was not scanned or whose scan result seems wrong. The report button is available for safe and flagged messages. Only after the user submits the form does the app send anonymized report metadata to the configured `BASE_URL` over HTTPS.
+Reporting is optional feedback for a saved message that was not scanned or whose scan result seems wrong. The Report button saves a local snapshot, then WorkManager queues an upload to the controlled API at `https://sms.apcida.stream/api/v1/reports`. The app uses that phone's invite-issued installation credential and Cloudflare Access service token, which are stored with Android Keystore. There is no shared report API key in the APK.
 
-The default reporting API base URL is `https://apcida-server.onrender.com/api/`.
-To enable uploads in a local Android build, add the key configured on the
-deployed server to the ignored root `local.properties` file:
+The server stores encrypted reports in a table separate from RAG. A report is received for human review; it does not change the AI example library automatically. Server copies expire after 30 days and are purged hourly; removal of service access deletes them sooner. The local copy stays on the phone until deleted there. Reports saved by older builds stay local after an upgrade.
 
-```properties
-apcida.reportApiKey=<same key configured on the deployed server>
-```
-
-For CI, use the `APCIDA_REPORT_API_KEY` environment variable instead. The
-optional `apcida.reportBaseUrl` property or `APCIDA_REPORT_BASE_URL` environment
-variable can override the default URL; the URL must end in `/api/`. If no key
-is supplied, reports remain pending on the device. Do not commit the key.
-
-For the thesis prototype, report submissions should be authenticated with a shared API key and timestamp:
-
-```text
-X-API-Key: <shared app/reporting key>
-X-Timestamp: <request timestamp>
-```
-
-The server checks the API key and rejects stale timestamps before accepting the report. This validates that the report request came from an authorized app client, while the SMS detection decision itself still comes from the on-device keyword and Gemma pipeline.
-
-Recommended hosting for the prototype: **Render or Railway with a small Node/Express REST API and hosted Postgres**. This keeps deployment simple, works naturally with Retrofit, and is enough for accepting optional scan feedback during thesis evaluation. Firebase Cloud Functions + Firestore is a reasonable second option if the team wants less server management, while a university VPS is useful only if access and setup support are readily available.
-
-Report uploads use WorkManager with a network constraint and retry after temporary failures. The app schedules an attempt on startup, after report submission, and when the Reports screen opens. A report stays Pending until the server acknowledges it with `success: true` and a report ID; then the local row changes to Sent. If the server stored a report but the app lost the response, the retry sends the same payload and the server returns its existing report ID. The request timeout is 90 seconds to allow the free server to wake from idle. Builds without a reporting key leave reports Pending.
+Uploads require an enrolled phone and the approved HTTPS host in the build. The Reports screen shows **Pending** while waiting and **Received for review** after the server acknowledges the report ID. Retries reuse the same ID so a lost response does not create a second report. The backend's `PHASE8_SECURE_REPORTS.md` describes the server setup and review workflow.
 
 ## Roadmap
 
