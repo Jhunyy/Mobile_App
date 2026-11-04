@@ -181,15 +181,15 @@ The model file is large — do **not** commit it to GitHub. Add to `.gitignore`:
 ## Notes
 
 - Keyword scores determine preliminary risk: 0–29 SAFE, 30–59 SUSPICIOUS, 60+ SCAM. Every score proceeds to Gemma.
-- The report upload sends the selected issue, optional remarks, observed verdict, and rule score. SMS text is uploaded only when the reporter explicitly checks its box. Sender addresses and contact names are not uploaded.
+- The report upload sends the selected issue, optional remarks, observed verdict, rule score, and the SMS text only after the reporter checks one required consent for review and possible redacted RAG reuse. Sender addresses and contact names are not uploaded by the report route.
 - New messages store the sender address locally so it can be shown in the inbox and detail screen. Existing messages keep "Unknown Sender" because their saved hashes cannot recover the address.
 - Contact names are optional. The inbox offers contact access once and keeps a Show/Hide contact names menu option. The app looks up only saved SMS sender numbers and does not save or upload contact names. Unknown numbers and alphanumeric sender IDs display as received. Contact membership does not change either numeric score; the existing final-verdict policy uses it only under strict conditions.
 
 ## Private report submission
 
-Reporting is optional feedback for a saved message that was not scanned or whose scan result seems wrong. The Report button saves a local snapshot, then WorkManager queues an upload to the controlled API at `https://sms.apcida.stream/api/v1/reports`. The app uses that phone's invite-issued installation credential and Cloudflare Access service token, which are stored with Android Keystore. There is no shared report API key in the APK.
+Reporting is optional feedback for a saved message that was not scanned or whose scan result seems wrong. The Report form previews the SMS text and requires one unchecked-by-default consent for private admin review and possible inclusion of a redacted, approved version in RAG. Without the message text and consent, Submit stays disabled. Submitting saves a local snapshot, then WorkManager queues an upload to the controlled API at `https://sms.apcida.stream/api/v1/reports`. The app uses that phone's invite-issued installation credential and Cloudflare Access service token, which are stored with Android Keystore. There is no shared report API key in the APK.
 
-The server stores encrypted reports in a table separate from RAG. A report is received for human review; it does not change the AI example library automatically. Server copies expire after 30 days and are purged hourly; removal of service access deletes them sooner. The local copy stays on the phone until deleted there. Reports saved by older builds stay local after an upgrade.
+The server stores encrypted reports in a table separate from RAG. A report is received for human review; it does not change the AI example library automatically. A reviewer must verify the label, remove personal details, and explicitly approve any RAG candidate. Server report copies expire after 30 days and are purged hourly; an approved RAG example may remain longer. Removal of service access deletes the report sooner. The local copy stays on the phone until deleted there. Reports saved by older builds lack the combined consent and stay local after an upgrade.
 
 Uploads require an enrolled phone and the approved HTTPS host in the build. The Reports screen shows **Pending** while waiting and **Received for review** after the server acknowledges the report ID. Retries reuse the same ID so a lost response does not create a second report. The backend's `PHASE8_SECURE_REPORTS.md` describes the server setup and review workflow.
 

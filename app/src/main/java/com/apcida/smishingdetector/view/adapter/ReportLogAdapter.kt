@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.apcida.smishingdetector.databinding.ItemReportLogBinding
 import com.apcida.smishingdetector.model.entity.Report
 import com.apcida.smishingdetector.backend.reporting.ReportUploadEligibility
+import com.apcida.smishingdetector.backend.reporting.ReportSnapshotFactory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,12 +43,13 @@ class ReportLogAdapter : ListAdapter<Report, ReportLogAdapter.ReportViewHolder>(
                 textReportType.text = report.reportType
 
                 // Sent status
-                if (!ReportUploadEligibility.isEligible(root.context, report.reportedAt)) {
-                    textReportStatus.text = "Saved locally"
-                    textReportStatus.setTextColor(Color.parseColor("#616161"))
-                } else if (report.isSent) {
+                if (report.isSent) {
                     textReportStatus.text = "Received for review ✓"
                     textReportStatus.setTextColor(Color.parseColor("#2E7D32"))
+                } else if (!ReportUploadEligibility.isEligible(root.context, report.reportedAt) ||
+                    !ReportSnapshotFactory.hasCombinedConsent(report)) {
+                    textReportStatus.text = "Saved locally"
+                    textReportStatus.setTextColor(Color.parseColor("#616161"))
                 } else {
                     textReportStatus.text = "Pending"
                     textReportStatus.setTextColor(Color.parseColor("#E65100"))

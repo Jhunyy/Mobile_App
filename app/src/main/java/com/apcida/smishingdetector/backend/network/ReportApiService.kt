@@ -16,13 +16,13 @@ interface ReportApiService {
     ): Response<ReportResponse>
 }
 
-/** No sender, rationale, indicators, or SMS body unless sharing was checked. */
+/** The SMS is sent only after the combined review/RAG consent was checked. */
 data class ReportPayload(
     val clientReportId: String,
     val reportType: String,
     val remarks: String?,
-    val smsText: String?,
-    val messageSharingConsent: Boolean,
+    val smsText: String,
+    val consentScope: String,
     val observedVerdict: String?,
     val riskScore: Float?,
 )

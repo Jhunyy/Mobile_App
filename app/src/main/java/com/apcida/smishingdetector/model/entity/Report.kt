@@ -68,6 +68,10 @@ data class Report(
     @ColumnInfo(name = "sms_text_snapshot")
     val smsTextSnapshot: String? = null,
 
+    // Null for reports created before the combined review/RAG consent was shown.
+    @ColumnInfo(name = "consent_scope")
+    val consentScope: String? = null,
+
     @ColumnInfo(name = "app_version_snapshot")
     val appVersionSnapshot: String? = null,
 

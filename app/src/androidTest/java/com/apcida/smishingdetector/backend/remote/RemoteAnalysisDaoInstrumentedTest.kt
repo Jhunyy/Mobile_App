@@ -226,7 +226,7 @@ class RemoteAnalysisDaoInstrumentedTest {
                 raw.version = 7
             }
             val migrated = Room.databaseBuilder(context, AppDatabase::class.java, name)
-                .addMigrations(AppDatabase.MIGRATION_7_8).build()
+                .addMigrations(AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9).build()
             try {
                 val row = migrated.messageDao().getMessageById(id)!!
                 assertEquals("Synthetic legacy SMS", row.content)

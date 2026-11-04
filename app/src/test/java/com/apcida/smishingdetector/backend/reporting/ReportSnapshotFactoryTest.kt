@@ -2,7 +2,7 @@ package com.apcida.smishingdetector.backend.reporting
 
 import com.apcida.smishingdetector.model.entity.Message
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ReportSnapshotFactoryTest {
@@ -24,10 +24,10 @@ class ReportSnapshotFactoryTest {
     )
 
     @Test
-    fun capturesAllEvidenceWithoutSmsUnlessSelected() {
+    fun capturesEvidenceWithConsentedSms() {
         val report = ReportSnapshotFactory.create(
             message, "Legitimate message was flagged", "Expected safe",
-            includeSmsText = false, appVersion = "1.2", reportedAt = 2000,
+            consentGranted = true, appVersion = "1.2", reportedAt = 2000,
             clientReportId = "5a884d88-074f-4fa2-842c-a9122ee37901"
         )
 
@@ -43,26 +43,32 @@ class ReportSnapshotFactoryTest {
         assertEquals("verify account\nunknown link", report.matchedIndicatorsSnapshot)
         assertEquals("1.2", report.appVersionSnapshot)
         assertEquals("gemma3-1b-it-int4.task", report.modelVersionSnapshot)
-        assertNull(report.smsTextSnapshot)
+        assertEquals(message.content, report.smsTextSnapshot)
+        assertEquals(ReportSnapshotFactory.REVIEW_AND_RAG_CANDIDATE, report.consentScope)
+        assertEquals(true, ReportSnapshotFactory.hasCombinedConsent(report))
+        assertEquals(false, ReportSnapshotFactory.hasCombinedConsent(report.copy(consentScope = null)))
     }
 
     @Test
     fun labelsRemoteAndRulesOnlySources() {
         val remote = ReportSnapshotFactory.create(message.copy(verdictSource = "REMOTE_GEMMA_RAG"),
-            "Other", null, false, "1.2")
+            "Other", null, true, "1.2")
         val local = ReportSnapshotFactory.create(message.copy(gemmaInvoked = false,
             gemmaClassification = null, gemmaConfidence = null, gemmaRationale = null),
-            "Other", null, false, "1.2")
+            "Other", null, true, "1.2")
         assertEquals("gemma3:12b+RAG", remote.modelVersionSnapshot)
         assertEquals("keyword-rules-v2", local.modelVersionSnapshot)
     }
 
     @Test
-    fun includesExactSmsOnlyWhenSelected() {
-        val report = ReportSnapshotFactory.create(
-            message, "Scam was not detected", null,
-            includeSmsText = true, appVersion = "1.2"
-        )
-        assertEquals(message.content, report.smsTextSnapshot)
+    fun refusesReportsWithoutCombinedConsentOrMessageText() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ReportSnapshotFactory.create(message, "Scam was not detected", null,
+                consentGranted = false, appVersion = "1.2")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ReportSnapshotFactory.create(message.copy(content = " "), "Scam was not detected", null,
+                consentGranted = true, appVersion = "1.2")
+        }
     }
 }

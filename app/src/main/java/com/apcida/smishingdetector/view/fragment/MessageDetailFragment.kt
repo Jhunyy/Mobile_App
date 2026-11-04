@@ -337,13 +337,13 @@ class MessageDetailFragment : Fragment() {
             onReportSubmitted = {
                     reportType,
                     remarks,
-                    includeSmsText ->
+                    consentGranted ->
 
                 submitReport(
                     message = message,
                     reportType = reportType,
                     remarks = remarks,
-                    includeSmsText = includeSmsText
+                    consentGranted = consentGranted
                 )
             }
         )
@@ -358,18 +358,16 @@ class MessageDetailFragment : Fragment() {
         message: Message,
         reportType: String,
         remarks: String?,
-        includeSmsText: Boolean
+        consentGranted: Boolean
     ) {
-
-        val reportedMessage = currentMessage ?: message
 
         viewLifecycleOwner.lifecycleScope.launch {
 
             val report = ReportSnapshotFactory.create(
-                message = reportedMessage,
+                message = message,
                 reportType = reportType,
                 remarks = remarks,
-                includeSmsText = includeSmsText,
+                consentGranted = consentGranted,
                 appVersion = BuildConfig.VERSION_NAME
             )
 

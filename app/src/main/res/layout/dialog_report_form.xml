@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fontFamily="@font/dm_sans_regular"
-        android:text="Tell us if the scan did not finish or its result seems wrong. Your report type and optional remarks are queued for private review when this phone has service access. SMS text is sent only if you check the box below. Server copies are kept for about 30 days; the local copy stays on this phone until you remove it. Reports are not added to the AI examples automatically."
+        android:text="Report a problem with this SMS or its analysis. Review the SMS text below. Submitting requires your consent to send the text to ApCiDa for private admin review and possible use as an approved RAG example after personal details are removed. The server keeps the report for up to 30 days; an approved RAG example may remain longer. No report is added to RAG automatically. The local report stays on this phone until you remove it."
         android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
@@ -89,7 +89,7 @@
         android:layout_marginTop="16dp"
         android:buttonTint="@color/primary"
         android:checked="false"
-        android:text="Include this SMS text in the report sent to the server. It may contain personal details and stays in the report if you delete the message."
+        android:text="I agree to send this SMS text for admin review and allow a version with personal details removed to be considered for ApCiDa's RAG examples if an admin approves it."
         android:textColor="@color/text_primary" />
 
     <TextView
@@ -102,7 +102,7 @@
         android:textColor="@color/text_primary"
         android:textIsSelectable="true"
         android:textSize="13sp"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
     <!-- Buttons -->
     <LinearLayout

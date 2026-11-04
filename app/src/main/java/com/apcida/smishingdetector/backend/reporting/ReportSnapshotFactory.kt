@@ -7,15 +7,25 @@ import java.util.UUID
 
 /** Captures the visible scan state once, before the report enters the upload queue. */
 object ReportSnapshotFactory {
+    const val REVIEW_AND_RAG_CANDIDATE = "REVIEW_AND_RAG_CANDIDATE"
+
+    fun hasCombinedConsent(report: Report): Boolean =
+        report.consentScope == REVIEW_AND_RAG_CANDIDATE &&
+            report.smsTextSnapshot?.let { it.isNotBlank() && it.length <= 4000 } == true
+
     fun create(
         message: Message,
         reportType: String,
         remarks: String?,
-        includeSmsText: Boolean,
+        consentGranted: Boolean,
         appVersion: String,
         reportedAt: Long = System.currentTimeMillis(),
         clientReportId: String = UUID.randomUUID().toString()
-    ): Report = Report(
+    ): Report {
+        require(consentGranted && message.content.isNotBlank() && message.content.length <= 4000) {
+            "SMS text and combined report consent are required"
+        }
+        return Report(
         messageId = message.messageId,
         clientReportId = clientReportId,
         reportType = reportType,
@@ -29,7 +39,8 @@ object ReportSnapshotFactory {
         processingStateSnapshot = message.processingState,
         aiStatusSnapshot = message.aiAnalysisStatus,
         matchedIndicatorsSnapshot = message.matchedIndicators,
-        smsTextSnapshot = message.content.takeIf { includeSmsText },
+        smsTextSnapshot = message.content,
+        consentScope = REVIEW_AND_RAG_CANDIDATE,
         appVersionSnapshot = appVersion,
         modelVersionSnapshot = when {
             message.verdictSource == "REMOTE_GEMMA_RAG" -> "gemma3:12b+RAG"
@@ -38,5 +49,6 @@ object ReportSnapshotFactory {
             else -> null
         },
         reportedAt = reportedAt
-    )
+        )
+    }
 }

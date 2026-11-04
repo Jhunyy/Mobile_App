@@ -8,6 +8,7 @@ import com.apcida.smishingdetector.BuildConfig
 import com.apcida.smishingdetector.backend.database.AppDatabase
 import com.apcida.smishingdetector.backend.repository.ReportRepository
 import com.apcida.smishingdetector.backend.reporting.ReportUploadEligibility
+import com.apcida.smishingdetector.backend.reporting.ReportSnapshotFactory
 import com.apcida.smishingdetector.model.entity.Report
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +28,8 @@ class ReportUploadManager(private val context: Context) {
 
     suspend fun uploadPendingReports(): Boolean = withContext(Dispatchers.IO) {
         val pending = repository.getUnsentReports().filter {
-            ReportUploadEligibility.isEligible(app, it.reportedAt)
+            ReportUploadEligibility.isEligible(app, it.reportedAt) &&
+                ReportSnapshotFactory.hasCombinedConsent(it)
         }
         if (pending.isEmpty()) return@withContext true
         if (!isInternetAvailable()) {
@@ -57,7 +59,10 @@ class ReportUploadManager(private val context: Context) {
             .create(ReportApiService::class.java)
 
         for (report in pending) uploadOne(report, api, backend, access)
-        repository.getUnsentReports().none { ReportUploadEligibility.isEligible(app, it.reportedAt) }
+        repository.getUnsentReports().none {
+            ReportUploadEligibility.isEligible(app, it.reportedAt) &&
+                ReportSnapshotFactory.hasCombinedConsent(it)
+        }
     }
 
     private suspend fun uploadOne(
@@ -70,13 +75,14 @@ class ReportUploadManager(private val context: Context) {
             Log.w(TAG, "Report upload skipped: local report has no durable ID.")
             return // Old local reports without a durable UUID stay local.
         }
-        val sms = report.smsTextSnapshot?.takeIf { it.isNotEmpty() && it.length <= 4000 }
+        val sms = report.smsTextSnapshot?.takeIf { it.isNotBlank() && it.length <= 4000 }
+            ?: return // Preserve malformed or old reports locally; never upload without consented text.
         val payload = ReportPayload(
             clientReportId = id,
             reportType = report.reportType,
             remarks = report.remarks?.take(500),
             smsText = sms,
-            messageSharingConsent = sms != null,
+            consentScope = report.consentScope ?: return,
             observedVerdict = report.finalVerdictSnapshot?.takeIf {
                 it in setOf("SAFE", "SUSPICIOUS", "SCAM", "UNVERIFIED")
             },

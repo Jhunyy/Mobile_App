@@ -53,12 +53,13 @@ class ReportFormDialog(
         val canShareSms = message.content.isNotBlank() && message.content.length <= 4000
         binding.checkboxShareSms.isEnabled = canShareSms
         binding.textSmsPreview.text = message.content
-        binding.textSmsPreview.visibility = View.GONE
+        binding.textSmsPreview.visibility = View.VISIBLE
+        binding.btnSubmitReport.isEnabled = false
         binding.checkboxShareSms.setOnCheckedChangeListener { _, checked ->
-            binding.textSmsPreview.visibility = if (checked) View.VISIBLE else View.GONE
+            binding.btnSubmitReport.isEnabled = checked && canShareSms
         }
         if (!canShareSms) {
-            binding.checkboxShareSms.text = "SMS text is too long to include in this report"
+            binding.checkboxShareSms.text = "This SMS is empty or too long to report (maximum 4,000 characters)."
         }
 
 
@@ -103,11 +104,8 @@ class ReportFormDialog(
                 }
 
             // Send result back to MessageDetailFragment
-            onReportSubmitted(
-                reportType,
-                remarks,
-                binding.checkboxShareSms.isChecked && canShareSms
-            )
+            if (!binding.checkboxShareSms.isChecked || !canShareSms) return@setOnClickListener
+            onReportSubmitted(reportType, remarks, binding.checkboxShareSms.isChecked)
 
             dialog.dismiss()
         }
