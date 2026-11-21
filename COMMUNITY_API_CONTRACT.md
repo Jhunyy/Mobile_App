@@ -1,60 +1,32 @@
-# Community contribution API contract
+# Consented thesis contribution API
 
-The Express/PostgreSQL server is not present in this repository. The Android client has a separate Retrofit interface for this feature and does not use the scam report endpoint. Configure an HTTPS `APCIDA_REPORT_BASE_URL` (or `apcida.reportBaseUrl` in `local.properties`) ending in `/api/`, and a separate `APCIDA_COMMUNITY_API_KEY` (or `apcida.communityApiKey`). Without the community key, local scanning/review works, but sharing is disabled.
+The Android contribution screen uses the enrolled phone's Bearer credential and Cloudflare Access service token at `https://sms.apcida.stream`. There is no shared community API key in the APK. The controlled server's study feature is disabled until its separate PostgreSQL schema, retention period, and expert access have been reviewed and enabled. The normal detection report endpoint is independent.
 
-The packaged API key is only a prototype gate: it can be extracted from an APK. A production service needs real client authentication, rate limits, and abuse controls. Never use a participant UUID alone as proof of identity.
+The phone reads recent inbox SMS locally only after the participant starts a scan and grants SMS permission. It offers up to 20 eligible, deduplicated messages per scan without requiring the rule suggestion to be SCAM or SAFE. The participant must select each message, edit or redact its text, choose SCAM or SAFE, and confirm upload. The cumulative cap is 40 messages per participant, with any mix of participant labels. The selected batch is kept in app-private no-backup storage until the server acknowledges every item. A private keyed fingerprint, rather than a plain hash of the original SMS, identifies retries and accepted items.
 
-## Endpoints
-
-`GET /api/community/contributions/progress?participantId=<uuid>` with `X-API-Key` returns:
-
-```json
-{"scamAccepted": 12, "safeAccepted": 15}
-```
-
-`POST /api/community/contributions` with `X-API-Key` receives a separately approved batch:
+`GET /api/v1/community/contributions/progress?participantId=<uuid>` returns `scamAccepted`, `safeAccepted`, and `totalAccepted` for the authenticated installation. `POST /api/v1/community/contributions` accepts 1–20 items:
 
 ```json
 {
   "batchId": "uuid",
   "participantId": "uuid",
   "submittedAt": 1792790000000,
-  "items": [
-    {
-      "clientId": "sha256-of-original-body",
-      "text": "Participant-reviewed and redacted SMS text",
-      "predictedCategory": "SCAM",
-      "reviewedCategory": "SAFE",
-      "reviewedAt": 1792790000000
-    }
-  ]
+  "consentScope": "STUDY_EVALUATION_ONLY",
+  "examinedCount": 18,
+  "offeredCount": 12,
+  "selectionMethod": "RECENT_INBOX_PARTICIPANT_REVIEW",
+  "items": [{
+    "clientId": "64-hex-character-keyed-fingerprint",
+    "text": "Participant-reviewed and redacted SMS text",
+    "localSuggestion": "UNVERIFIED",
+    "reviewedCategory": "SAFE",
+    "reviewedAt": 1792790000000
+  }]
 }
 ```
 
-Return HTTP 2xx only after committing the decision for every item. The response is:
+The response lists `acceptedClientIds`, `rejectedClientIds`, and `progress`. The server's database transaction enforces the 40-message cap, participant binding, duplicate checks, and idempotent batch replay. A partial response is treated as an error so the phone retries the original batch. `DELETE /api/v1/community/contributions` deletes the installation's accepted research records and records the withdrawal time; the phone then clears local pending data and cached counts.
 
-```json
-{
-  "acceptedClientIds": ["sha256-of-original-body"],
-  "rejectedClientIds": [],
-  "progress": {"scamAccepted": 12, "safeAccepted": 16}
-}
-```
+The server stores edited SMS separately from reports and RAG. Research analysis later processes up to ten queued contributions sequentially on the private admin website. A network expert labels the same edited text without seeing the system prediction. The participant's category and local rule suggestion are not expert ground truth. A result on this participant-selected, redacted set must be described as such in the thesis.
 
-The client caches only the server's accepted counts. An approved batch is stored in Android's no-backup private directory until acknowledged and can be retried with the same `batchId` and `clientId` values. The server must make repeated submissions idempotent and return the same accepted/rejected decisions. A missing ID remains pending. If the server rejects an item, include it in `rejectedClientIds` so the client stops retrying it. The client never sends sender addresses, contact names, or unrelated inbox messages.
-
-## Server rules
-
-- Authenticate the client and bind the pseudonymous participant ID to an authenticated installation or research enrollment. Apply rate limits.
-- Validate type, encoding, and length of every field. Accept only `SCAM`/`SAFE` reviewed and predicted categories. Reject personal identifiers, authentication codes, and empty text. Recheck redaction server side.
-- Enforce at most 20 accepted `SCAM`, 20 accepted `SAFE`, and 40 total per participant, using transactions and unique constraints. Count the **reviewed** category for participant limits.
-- Deduplicate by participant/client ID and normalized message content, and retain the batch idempotency key. Never count a retry twice.
-- Store predicted and reviewed labels separately. Initialize `verificationStatus` to `PENDING`; add a separate researcher verified label and verifier record only after independent review. Do not calculate accuracy from predicted labels.
-- Keep research-wide counts for accepted and independently verified Scam/Safe records, duplicate and excluded decisions, participant IDs, and submission dates. The study target is 100 verified Scam and 100 verified Safe messages; these totals are not returned to the participant UI.
-- Use HTTPS, restricted database access, retention/deletion rules, and appropriate study consent records. Never log raw SMS request bodies.
-
-The Android client cannot verify historical SMS behavior or successful uploads until the backend implements this contract and the app is tested on a device with an installed Gemma model.
-
-## Android distribution note
-
-`READ_SMS` and `RECEIVE_SMS` are restricted for Google Play distribution. Google Play's [SMS and Call Log policy](https://support.google.com/googleplay/android-developer/answer/10208820) lists an anti-smishing exception, but eligibility requires a documented track record of significant protection and a Play Console declaration/review. This prototype does not claim that approval. The community screen requests `READ_SMS` through Android only after explicit scan consent and handles denial; it cannot bypass platform or store restrictions.
+`READ_SMS` and `RECEIVE_SMS` are restricted for Google Play distribution. The community screen requests SMS access only after explicit scan consent and handles denial; it cannot bypass platform or store restrictions.

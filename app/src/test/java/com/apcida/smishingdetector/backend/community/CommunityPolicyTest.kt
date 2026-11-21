@@ -2,15 +2,13 @@ package com.apcida.smishingdetector.backend.community
 
 import org.junit.Assert.*
 import org.junit.Test
-import com.apcida.smishingdetector.model.data.GemmaResult
-import com.apcida.smishingdetector.model.data.RiskLevel
 
 class CommunityPolicyTest {
-    @Test fun authenticationCodesAreNeverCandidates() {
+    @Test fun codesAreRedactedBeforeReviewWhileOtpNoticesRemainEligible() {
         assertFalse(CommunityPolicy.eligible("Your OTP is 123456"))
-        assertFalse(CommunityPolicy.eligible("Your verification code is ABCDEF"))
-        assertFalse(CommunityPolicy.eligible("Code 1234 for your account"))
-        assertFalse(CommunityPolicy.eligible("Call 0917-123-4567"))
+        assertTrue(CommunityPolicy.eligible(CommunityPolicy.redact("Your OTP is 123456")))
+        assertFalse(CommunityPolicy.redact("Your OTP is 123456").contains("123456"))
+        assertTrue(CommunityPolicy.eligible(CommunityPolicy.redact("Call 0917-123-4567")))
     }
 
     @Test fun redactsIdentifiersBeforeUpload() {
@@ -23,28 +21,12 @@ class CommunityPolicyTest {
 
     @Test fun deduplicatesWhitespaceAndTracksRemainingLimit() {
         assertEquals(CommunityPolicy.fingerprint("Hello  world"), CommunityPolicy.fingerprint(" hello world "))
-        assertEquals(8, CommunityPolicy.remaining(12))
-        assertEquals(0, CommunityPolicy.remaining(20))
-        assertEquals(0, CommunityPolicy.remaining(25))
-    }
-
-    @Test fun uncertainAndFailedInferenceNeverBecomeCandidates() {
-        val highScam = GemmaResult("SCAM", "HIGH", "Suspicious link")
-        assertEquals("SCAM", CommunityPolicy.candidateCategory(RiskLevel.SAFE, highScam,
-            RiskLevel.SCAM, 1, 1))
-        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, highScam.copy(confidence = "LOW"),
-            RiskLevel.SCAM, 1, 1))
-        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, GemmaResult.fallback(),
-            RiskLevel.SUSPICIOUS, 1, 1))
-        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, highScam,
-            RiskLevel.SCAM, 0, 1))
-    }
-
-    @Test fun modelOpinionWithoutFinalScamVerdictIsNotACommunityScamCandidate() {
-        val modelOpinion = GemmaResult("SCAM", "HIGH", "Uncorroborated suspicion")
-        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, modelOpinion,
-            RiskLevel.SUSPICIOUS, 1, 1))
-        assertNull(CommunityPolicy.candidateCategory(RiskLevel.SAFE, modelOpinion,
-            RiskLevel.SAFE, 1, 1))
+        assertEquals(CommunityPolicy.fingerprint("Hello  world", ByteArray(32) { 1 }),
+            CommunityPolicy.fingerprint(" hello world ", ByteArray(32) { 1 }))
+        assertNotEquals(CommunityPolicy.fingerprint("Hello world", ByteArray(32) { 1 }),
+            CommunityPolicy.fingerprint("Hello world", ByteArray(32) { 2 }))
+        assertEquals(28, CommunityPolicy.remaining(12))
+        assertEquals(20, CommunityPolicy.remaining(20))
+        assertEquals(0, CommunityPolicy.remaining(40))
     }
 }

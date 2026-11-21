@@ -6,18 +6,19 @@ import org.junit.Test
 class CommunitySubmissionPolicyTest {
     private val one = ContributionItem("one", "one", "SCAM", "SCAM", 1)
     private val two = ContributionItem("two", "two", "SAFE", "SAFE", 1)
-    private val batch = ContributionBatch("batch", "participant", 1, listOf(one, two))
+    private val batch = ContributionBatch("batch", "participant", 1, "STUDY_EVALUATION_ONLY",
+        2, 2, "RECENT_INBOX_PARTICIPANT_REVIEW", listOf(one, two))
 
     @Test fun onlyAcknowledgedItemsLeaveRetryQueue() {
-        val response = ContributionResponse(listOf("one"), emptyList(), ContributionProgress(1, 0))
+        val response = ContributionResponse(listOf("one"), emptyList(), ContributionProgress(1, 0, 1))
         assertEquals(listOf(two), CommunitySubmissionPolicy.remaining(batch, response))
         assertEquals(batch.items, CommunitySubmissionPolicy.remaining(batch,
-            ContributionResponse(emptyList(), emptyList(), ContributionProgress(0, 0))))
+            ContributionResponse(emptyList(), emptyList(), ContributionProgress(0, 0, 0))))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnknownAcknowledgement() {
         CommunitySubmissionPolicy.remaining(batch,
-            ContributionResponse(listOf("other"), emptyList(), ContributionProgress(1, 0)))
+            ContributionResponse(listOf("other"), emptyList(), ContributionProgress(1, 0, 1)))
     }
 }

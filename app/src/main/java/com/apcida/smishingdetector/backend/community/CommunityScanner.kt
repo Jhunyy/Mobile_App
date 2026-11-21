@@ -5,17 +5,16 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.provider.Telephony
-import android.util.Log
+import android.util.Base64
 import androidx.core.content.ContextCompat
-import com.apcida.smishingdetector.backend.database.AppDatabase
-import com.apcida.smishingdetector.backend.database.DatabaseSeeder
 import com.apcida.smishingdetector.backend.detection.BackendKeywordRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import java.security.SecureRandom
 
-data class ContributionCandidate(val id: String, val text: String, val predictedCategory: String)
+data class ContributionCandidate(val id: String, val text: String, val localSuggestion: String)
 data class CommunityScanProgress(
     val examined: Int,
     val analyzed: Int,
@@ -41,19 +40,24 @@ class CommunityScanner(private val context: Context) {
         private const val LEGACY_NEXT_OFFSET = "next_sms_offset"
         private const val SCAN_WINDOW_MILLIS = 30L * 24 * 60 * 60 * 1000
         private const val MAX_SCAN_MILLIS = 180_000L
-        private const val MAX_INFERENCE_MILLIS = 60_000L
         private const val MAX_EXAMINED = 1_000
         private const val MAX_ANALYZED = 20
-        private const val MAX_CONSECUTIVE_FAILURES = 3
     }
 
     private data class ScanMarker(val date: Long, val id: Long)
 
     private val scanPrefs = context.getSharedPreferences(SCAN_PREFS, Context.MODE_PRIVATE)
+    private val fingerprintKey: ByteArray by lazy {
+        val saved = scanPrefs.getString("fingerprint_key", null)
+        if (saved != null) Base64.decode(saved, Base64.NO_WRAP) else ByteArray(32).also { key ->
+            SecureRandom().nextBytes(key)
+            check(scanPrefs.edit().putString("fingerprint_key",
+                Base64.encodeToString(key, Base64.NO_WRAP)).commit())
+        }
+    }
 
     suspend fun scan(
-        scamRemaining: Int,
-        safeRemaining: Int,
+        remaining: Int,
         excludedIds: Set<String>,
         onProgress: suspend (CommunityScanProgress) -> Unit = {}
     ): CommunityScanResult =
@@ -65,8 +69,6 @@ class CommunityScanner(private val context: Context) {
             val found = mutableListOf<ContributionCandidate>()
             val seenIds = excludedIds.toMutableSet()
             val seenTemplates = mutableSetOf<String>()
-            var scamCount = 0
-            var safeCount = 0
             var examined = 0
             var analyzed = 0
             var stopReason = CommunityScanResult.StopReason.FINISHED
@@ -106,7 +108,7 @@ class CommunityScanner(private val context: Context) {
                 val idIndex = it.getColumnIndexOrThrow(Telephony.Sms._ID)
                 val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
                 val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                while (scamCount < scamRemaining || safeCount < safeRemaining) {
+                while (found.size < remaining) {
                     coroutineContext.ensureActive()
                     if (SystemClock.elapsedRealtime() >= deadline) {
                         stopReason = CommunityScanResult.StopReason.TIME_LIMIT
@@ -121,25 +123,19 @@ class CommunityScanner(private val context: Context) {
                         break
                     }
                     if (!it.moveToNext()) break
-                    val previousMarker = lastChecked
                     lastChecked = ScanMarker(it.getLong(dateIndex), it.getLong(idIndex))
                     examined++
                     if (examined % 25 == 0) reportProgress()
                     val body = it.getString(bodyIndex) ?: continue
-                    if (!CommunityPolicy.eligible(body)) continue
-                    val id = CommunityPolicy.fingerprint(body)
+                    val redacted = CommunityPolicy.redact(body)
+                    if (!CommunityPolicy.eligible(redacted)) continue
+                    val id = CommunityPolicy.fingerprint(body, fingerprintKey)
                     if (!seenIds.add(id) || !seenTemplates.add(CommunityPolicy.template(body))) continue
                     val rules = BackendKeywordRules.analyze(body)
                     analyzed++
-                    val category = when {
-                        rules.classification.name == "SCAM" && scamCount < scamRemaining -> "SCAM"
-                        rules.classification.name == "SAFE" && safeCount < safeRemaining -> "UNVERIFIED"
-                        else -> null
-                    } ?: continue
-                    val redacted = CommunityPolicy.redact(body)
-                    if (redacted.isBlank()) continue
-                    found += ContributionCandidate(id, redacted, category)
-                    if (category == "SCAM") scamCount++ else safeCount++
+                    val suggestion = if (rules.classification.name == "SAFE") "UNVERIFIED"
+                        else rules.classification.name
+                    found += ContributionCandidate(id, redacted, suggestion)
                     reportProgress()
                 }
             }

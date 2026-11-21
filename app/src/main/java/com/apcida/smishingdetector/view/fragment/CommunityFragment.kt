@@ -55,8 +55,10 @@ class CommunityFragment : Fragment() {
     private lateinit var retryButton: Button
     private lateinit var discardButton: Button
     private lateinit var busy: ProgressBar
-    private var progress = ContributionProgress(0, 0)
+    private var progress = ContributionProgress(0, 0, 0)
     private var scanning = false
+    private var lastScanExamined = 0
+    private var lastScanOffered = 0
 
     private val smsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startScan() else status.text = "SMS access was denied. You can return to Settings at any time."
@@ -79,17 +81,17 @@ class CommunityFragment : Fragment() {
         val intro = panel()
         intro.addView(label("Your choice", 18f, true, R.color.inbox_text))
         intro.addView(label(
-            "You may contribute up to 20 scam and 20 safe SMS messages (40 total). ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation if they are still within that period. Only local keyword screening happens during the scan. Suggested labels are not verified; you must review and confirm them. Nothing is shared during the scan. You will review, edit, remove, and confirm each proposed message before upload. Participation is optional.",
+            "You may contribute up to 40 SMS messages over several sessions. ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation. Local keyword rules are recorded for research; they do not decide which eligible messages are offered or verify a label. Nothing is shared during the scan. Review, edit, select, and label each message before upload. Participation is optional.",
             14f, false, R.color.inbox_muted), margin(0, 8))
-        intro.addView(label("A contribution may share your edited SMS text, the model's predicted category, your reviewed category, a pseudonymous participant ID, and submission time. Sender numbers and contact names are never included. Researchers must verify labels independently.",
+        intro.addView(label("A contribution shares your edited SMS text, a local rule suggestion, your chosen category, a pseudonymous participant ID, and review/submission times. Sender numbers and contact names are not sent. A network expert will independently label the messages; research analysis happens later.",
             13f, false, R.color.inbox_muted), margin(0, 10))
 
         body.addView(label("Your Contribution", 18f, true, R.color.inbox_text), margin(0, 22))
         progressText = label("", 15f, false, R.color.inbox_text)
         val progressPanel = panel()
         progressPanel.addView(progressText)
-        scamBar = progressBar(progressPanel, 20)
-        safeBar = progressBar(progressPanel, 20)
+        scamBar = progressBar(progressPanel, 40)
+        safeBar = progressBar(progressPanel, 40)
         totalBar = progressBar(progressPanel, 40)
 
         startButton = button("Start Contributing") { askScanConsent() }
@@ -108,6 +110,26 @@ class CommunityFragment : Fragment() {
                 }.show()
         }
         discardButton.visibility = retryButton.visibility
+        button("Withdraw Study Contributions") {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Withdraw contributed messages?")
+                .setMessage("This requests deletion of your study contributions from the research server and clears pending messages on this phone. It does not revoke AI Protection enrollment.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Withdraw") { _, _ ->
+                    lifecycleScope.launch {
+                        try {
+                            repository.withdraw()
+                            progress = ContributionProgress(0, 0, 0)
+                            showProgress()
+                            retryButton.visibility = View.GONE
+                            discardButton.visibility = View.GONE
+                            showShareFeedback("Study contributions withdrawn.")
+                        } catch (error: Exception) {
+                            showShareFeedback(error.message ?: "Withdrawal unavailable. Try again later.")
+                        }
+                    }
+                }.show()
+        }
         status = label("", 14f, false, R.color.inbox_muted)
         body.addView(status, margin(0, 10))
         busy = ProgressBar(requireContext()).apply { visibility = View.GONE }
@@ -177,14 +199,13 @@ class CommunityFragment : Fragment() {
                     }
                 } ?: repository.cachedProgress()
                 showProgress()
-                if (progress.scamAccepted >= 20 && progress.safeAccepted >= 20) {
+                if (progress.totalAccepted >= 40) {
                     status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
                     return@launch
                 }
                 status.text = "Screening recent SMS with local keyword rules…"
                 val result = CommunityScanner(requireContext().applicationContext).scan(
-                    CommunityPolicy.remaining(progress.scamAccepted),
-                    CommunityPolicy.remaining(progress.safeAccepted), repository.acceptedIds()
+                    CommunityPolicy.remaining(progress.totalAccepted), repository.acceptedIds()
                 ) { scanProgress ->
                     withContext(Dispatchers.Main) {
                         status.text = if (scanProgress.analyzing) {
@@ -195,6 +216,8 @@ class CommunityFragment : Fragment() {
                     }
                 }
                 status.text = scanResultMessage(result)
+                lastScanExamined = result.progress.examined
+                lastScanOffered = result.candidates.size
                 if (result.candidates.isNotEmpty()) renderCandidates(result.candidates)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -232,14 +255,13 @@ class CommunityFragment : Fragment() {
             val panel = panel(candidateContainer)
             val include = CheckBox(requireContext()).apply {
                 text = "Include this message"
-                isChecked = candidate.predictedCategory == "SCAM"
+                isChecked = false
                 setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
             }
             panel.addView(include)
-            panel.addView(label("Local rule suggestion: ${candidate.predictedCategory} (review required)", 13f, false, R.color.inbox_muted))
             val categories = Spinner(requireContext())
             categories.adapter = object : ArrayAdapter<String>(requireContext(),
-                android.R.layout.simple_spinner_item, listOf("SCAM", "SAFE")) {
+                android.R.layout.simple_spinner_item, listOf("Choose a label", "SCAM", "SAFE")) {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
                     super.getView(position, convertView, parent).apply {
                         (this as TextView).setTextColor(ContextCompat.getColor(context, R.color.inbox_text))
@@ -251,7 +273,7 @@ class CommunityFragment : Fragment() {
                         setBackgroundColor(Color.WHITE)
                     }
             }.apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-            categories.setSelection(if (candidate.predictedCategory == "SCAM") 0 else 1)
+            categories.setSelection(0)
             panel.addView(categories)
             val text = EditText(requireContext()).apply {
                 setText(candidate.text)
@@ -274,7 +296,7 @@ class CommunityFragment : Fragment() {
 
     private fun confirmSubmission() {
         if (!repository.configured()) {
-            val message = "Sharing is unavailable in this app build. A Community API key and research server must be configured before messages can be uploaded. No message has been shared."
+            val message = "Sharing is unavailable until this phone is enrolled and the research server is enabled. No message has been shared."
             showShareFeedback(message)
             AlertDialog.Builder(requireContext())
                 .setTitle("Sharing unavailable")
@@ -289,17 +311,19 @@ class CommunityFragment : Fragment() {
         }
         val selected = rows.filter { it.include.isChecked }
         if (selected.isEmpty()) { showShareFeedback("Select at least one message to share."); return }
-        val scamRemaining = CommunityPolicy.remaining(progress.scamAccepted)
-        val safeRemaining = CommunityPolicy.remaining(progress.safeAccepted)
+        if (selected.any { it.category.selectedItem.toString() !in setOf("SCAM", "SAFE") }) {
+            showShareFeedback("Choose Scam or Safe for every selected message.")
+            return
+        }
         val scamCount = selected.count { it.category.selectedItem.toString() == "SCAM" }
         val safeCount = selected.size - scamCount
-        if (scamCount > scamRemaining || safeCount > safeRemaining || selected.size > 40 - progress.scamAccepted - progress.safeAccepted) {
-            showShareFeedback("Selection exceeds your remaining contribution limits. Remove or relabel messages.")
+        if (selected.size > CommunityPolicy.remaining(progress.totalAccepted)) {
+            showShareFeedback("Selection exceeds your remaining 40-message limit. Remove messages.")
             return
         }
         val edited = selected.map { row ->
             val text = CommunityPolicy.redact(row.text.text.toString())
-            ContributionItem(row.candidate.id, text, row.candidate.predictedCategory,
+            ContributionItem(row.candidate.id, text, row.candidate.localSuggestion,
                 row.category.selectedItem.toString(), System.currentTimeMillis())
         }
         if (edited.any { !CommunityPolicy.eligible(it.text) }) {
@@ -313,12 +337,13 @@ class CommunityFragment : Fragment() {
         shareStatus.visibility = View.GONE
         AlertDialog.Builder(requireContext())
             .setTitle("Share reviewed messages?")
-            .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server? The server will also receive predicted and reviewed categories, a pseudonymous ID, and timestamps. Researchers will verify the labels. This is a separate upload confirmation.")
+            .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server for thesis evaluation only? It will also receive local suggestions, your labels, a pseudonymous ID, and timestamps. A network expert will label them independently. This is a separate upload confirmation.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Confirm and Share") { _, _ ->
                 lifecycleScope.launch {
                     try {
-                        withContext(Dispatchers.IO) { repository.queue(repository.makeBatch(edited)) }
+                        withContext(Dispatchers.IO) { repository.queue(repository.makeBatch(
+                            edited, lastScanExamined, lastScanOffered)) }
                         candidateContainer.removeAllViews()
                         rows.clear()
                         submitButton.visibility = View.GONE
@@ -365,11 +390,11 @@ class CommunityFragment : Fragment() {
     }
 
     private fun showProgress() {
-        progressText.text = "Scam Messages: ${progress.scamAccepted}/20\nSafe Messages: ${progress.safeAccepted}/20\nTotal Contributed: ${progress.scamAccepted + progress.safeAccepted}/40"
+        progressText.text = "Your Scam labels: ${progress.scamAccepted}\nYour Safe labels: ${progress.safeAccepted}\nTotal Contributed: ${progress.totalAccepted}/40"
         scamBar.progress = progress.scamAccepted
         safeBar.progress = progress.safeAccepted
-        totalBar.progress = progress.scamAccepted + progress.safeAccepted
-        if (progress.scamAccepted == 20 && progress.safeAccepted == 20) {
+        totalBar.progress = progress.totalAccepted
+        if (progress.totalAccepted >= 40) {
             startButton.visibility = View.GONE
             status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
         }

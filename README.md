@@ -48,7 +48,7 @@ Repeated message text is analyzed when received again outside the short duplicat
 
 Gemma's SCAM answer without independent strong rule evidence produces a SUSPICIOUS warning, while a strong credential/payment request or a high-risk URL can support a definitive SCAM verdict. A HIGH-confidence LEGITIMATE result can clear a weak rule-SUSPICIOUS warning, but strong rule evidence remains flagged. Brief neutral messages without a link, request, or fraud cue can stay SAFE despite an unsupported Gemma SCAM answer. The app logs rule, Gemma, confidence, final verdict, and AI status without logging SMS text. Model-reported confidence is displayed but is not a calibrated probability. See [DETECTION_EVALUATION.md](DETECTION_EVALUATION.md) for the labeling and measurement plan.
 
-SMS classification runs on-device. Optional reports and community contributions can share SMS text after the participant reviews the disclosure; community text is redacted before upload.
+Live SMS classification runs on-device. Optional reports and thesis contributions share SMS text only after separate participant review and confirmation. Contributions use the enrolled phone's private credentials, are redacted before upload, and are analyzed later in sequential research batches; see [COMMUNITY_API_CONTRACT.md](COMMUNITY_API_CONTRACT.md).
 
 ## Architecture
 
