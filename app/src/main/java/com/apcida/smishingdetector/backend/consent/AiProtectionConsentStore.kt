@@ -44,6 +44,14 @@ class AiProtectionConsentStore(
             .putString("remote_deletion_status", RemoteDeletionStatus.CONFIRMED.name).commit())
     }
 
+    /** A new invite needs fresh consent and must not inherit a prior deletion marker. */
+    @Synchronized fun prepareForNewEnrollment() {
+        check(!remoteDeletionPending()) { "Resolve pending remote deletion before enrollment" }
+        check(!hasProductionCredential()) { "Resolve existing installation before enrollment" }
+        revoke()
+        check(!remoteDeletionPending()) { "Could not reset enrollment state" }
+    }
+
     fun snapshot(): Snapshot = Snapshot(
         prefs.getBoolean("enabled", false) && prefs.getInt("disclosure_version", 0) == DISCLOSURE_VERSION,
         prefs.getLong("granted_at", 0), prefs.getLong("generation", 0)

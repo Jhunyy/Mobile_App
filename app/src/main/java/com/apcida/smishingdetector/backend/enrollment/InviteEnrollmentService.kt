@@ -31,6 +31,13 @@ internal class InviteEnrollmentService(context: Context) {
                     backend.hasStoredCredential() || access.hasStoredCredential()) {
                     return@withLock Result.ALREADY_CONFIGURED
                 }
+                try {
+                    val consent = AiProtectionConsentStore(app)
+                    consent.prepareForNewEnrollment()
+                    consent.reconcileRevokedPending()
+                } catch (_: Exception) {
+                    return@withLock Result.FAILED
+                }
                 val bundle = try {
                     InviteEnrollmentClient.redeem(host, code)
                 } catch (_: Exception) {

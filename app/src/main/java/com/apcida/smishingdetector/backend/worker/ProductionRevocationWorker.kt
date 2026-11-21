@@ -30,11 +30,8 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
             val pending = consent.remoteDeletionPending()
             val serverConfirmed = consent.remoteDeletionStatus() ==
                 AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED
-            val localCleanup = serverConfirmed &&
-                (ProductionCredentialStore(app).hasStoredCredential() ||
-                    CloudflareAccessCredentialStore(app).hasStoredCredential())
-            if (!pending && !localCleanup) return
-            if (pending) ProductionRenewalWorker.cancel(app)
+            if (!pending) return
+            ProductionRenewalWorker.cancel(app)
             if (pending && !serverConfirmed && !replace && consent.remoteDeletionStatus() in setOf(
                     AiProtectionConsentStore.RemoteDeletionStatus.RETRY_PAUSED,
                     AiProtectionConsentStore.RemoteDeletionStatus.AUTH_REJECTED,
@@ -63,13 +60,12 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
         val access = CloudflareAccessCredentialStore(applicationContext)
         val serverConfirmed = consent.remoteDeletionStatus() ==
             AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED
-        if (!consent.remoteDeletionPending() || serverConfirmed) {
-            if (!consent.remoteDeletionPending() && !serverConfirmed)
-                return Result.success()
+        if (!consent.remoteDeletionPending()) return Result.success()
+        if (serverConfirmed) {
             return try {
-                if (consent.remoteDeletionPending()) consent.markRemoteDeletionConfirmed()
                 credentials.clear()
                 access.clear()
+                consent.markRemoteDeletionConfirmed()
                 Result.success()
             } catch (_: Exception) { Result.retry() }
         }
@@ -94,9 +90,9 @@ class ProductionRevocationWorker(context: Context, params: WorkerParameters) :
                 try {
                     consent.markRemoteDeletionStatus(
                         AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED)
-                    consent.markRemoteDeletionConfirmed()
                     credentials.clear()
                     access.clear()
+                    consent.markRemoteDeletionConfirmed()
                 } catch (_: Exception) {
                     return Result.retry()
                 }

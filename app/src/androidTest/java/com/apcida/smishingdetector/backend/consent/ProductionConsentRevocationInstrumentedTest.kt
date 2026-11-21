@@ -51,4 +51,33 @@ class ProductionConsentRevocationInstrumentedTest {
             context.getSharedPreferences(preferenceName, 0).edit().clear().commit()
         }
     }
+
+    @Test fun newEnrollmentClearsCompletedDeletionMarker() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val preferenceName = "production_new_enrollment_test_" + UUID.randomUUID()
+        try {
+            var hasCredential = true
+            val store = AiProtectionConsentStore(context, preferenceName,
+                hasProductionCredential = { hasCredential }, enqueueDeletion = {})
+            store.grant(1000)
+            store.revoke()
+            assertTrue(store.remoteDeletionPending())
+            assertThrows(IllegalStateException::class.java) { store.prepareForNewEnrollment() }
+            store.markRemoteDeletionStatus(AiProtectionConsentStore.RemoteDeletionStatus.CONFIRMED)
+            store.markRemoteDeletionConfirmed()
+            hasCredential = false
+            val priorConsent = store.grant(2000)
+            assertTrue(priorConsent.enabled)
+            store.prepareForNewEnrollment()
+            val reopened = AiProtectionConsentStore(context, preferenceName,
+                hasProductionCredential = { false }, enqueueDeletion = {})
+            assertFalse(reopened.remoteDeletionPending())
+            assertFalse(reopened.snapshot().enabled)
+            assertTrue(reopened.snapshot().generation > priorConsent.generation)
+            assertEquals(AiProtectionConsentStore.RemoteDeletionStatus.NOT_REQUIRED,
+                reopened.remoteDeletionStatus())
+        } finally {
+            context.getSharedPreferences(preferenceName, 0).edit().clear().commit()
+        }
+    }
 }
