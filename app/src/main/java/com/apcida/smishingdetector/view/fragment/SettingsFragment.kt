@@ -207,7 +207,7 @@ class SettingsFragment : Fragment() {
 
         section(body, "Community", 22)
         val community = card(body)
-        linkRow(community, R.drawable.ic_groups, "Help the Community", "Contribute up to 20 scam and 20 safe messages to improve detection") {
+        linkRow(community, R.drawable.ic_groups, "Help the Community", "Contribute up to 40 reviewed SMS for thesis evaluation") {
             findNavController().navigate(R.id.communityFragment)
         }
         community.addView(label("ⓘ   Research sharing is separate from AI Protection. You review and confirm each upload.", 13f, false, R.color.inbox_safe).apply {

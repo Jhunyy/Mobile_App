@@ -85,6 +85,8 @@ class CommunityFragment : Fragment() {
             14f, false, R.color.inbox_muted), margin(0, 8))
         intro.addView(label("A contribution shares your edited SMS text, a local rule suggestion, your chosen category, a pseudonymous participant ID, and review/submission times. Sender numbers and contact names are not sent. A network expert will independently label the messages; research analysis happens later.",
             13f, false, R.color.inbox_muted), margin(0, 10))
+        intro.addView(label("Study records are kept in the active research database for up to 365 days after your latest upload. You can withdraw your contributions in this screen.",
+            13f, false, R.color.inbox_muted), margin(0, 10))
 
         body.addView(label("Your Contribution", 18f, true, R.color.inbox_text), margin(0, 22))
         progressText = label("", 15f, false, R.color.inbox_text)
@@ -337,7 +339,7 @@ class CommunityFragment : Fragment() {
         shareStatus.visibility = View.GONE
         AlertDialog.Builder(requireContext())
             .setTitle("Share reviewed messages?")
-            .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server for thesis evaluation only? It will also receive local suggestions, your labels, a pseudonymous ID, and timestamps. A network expert will label them independently. This is a separate upload confirmation.")
+            .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server for thesis evaluation only? It will also receive local suggestions, your labels, a pseudonymous ID, and timestamps. A network expert will label them independently. Active study records are kept for up to 365 days after your latest upload; you can withdraw them. This is a separate upload confirmation.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Confirm and Share") { _, _ ->
                 lifecycleScope.launch {
