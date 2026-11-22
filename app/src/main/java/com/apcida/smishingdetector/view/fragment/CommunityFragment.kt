@@ -77,7 +77,7 @@ class CommunityFragment : Fragment() {
         val intro = panel()
         intro.addView(label("Your choice", 18f, true, R.color.inbox_text))
         intro.addView(label(
-            "You may contribute up to 40 SMS messages over several sessions. ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation. Local keyword rules are recorded for research; they do not decide which eligible messages are offered or verify a label. Nothing is shared during the scan. Review, edit, and select each message before upload. Participation is optional.",
+            "You may contribute up to 40 SMS messages over several sessions. deText will examine accessible SMS received in the last 30 days, including messages received before installation. Local keyword rules are recorded for research; they do not decide which eligible messages are offered or verify a label. Nothing is shared during the scan. Review, edit, and select each message before upload. Participation is optional.",
             14f, false, R.color.inbox_muted), margin(0, 8))
         intro.addView(label("A contribution shares your edited SMS text, a local rule suggestion, a pseudonymous participant ID, and review/submission times. Sender numbers and contact names are not sent. A network expert will independently label the messages; research analysis happens later.",
             13f, false, R.color.inbox_muted), margin(0, 10))
@@ -165,7 +165,7 @@ class CommunityFragment : Fragment() {
         }
         AlertDialog.Builder(requireContext())
             .setTitle("Start local SMS scan?")
-            .setMessage("ApCiDa will examine accessible SMS received in the last 30 days on this device to find possible research contributions. This scan sends no SMS to the server. You will separately review and confirm any upload.")
+            .setMessage("deText will examine accessible SMS received in the last 30 days on this device to find possible research contributions. This scan sends no SMS to the server. You will separately review and confirm any upload.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Start Contributing") { _, _ ->
                 if (com.apcida.smishingdetector.util.PermissionHelper.hasReadSmsPermission(requireContext())) startScan()
@@ -196,7 +196,7 @@ class CommunityFragment : Fragment() {
                 } ?: repository.cachedProgress()
                 showProgress()
                 if (progress.totalAccepted >= 40) {
-                    status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
+                    status.text = "Contribution Complete. Thank you for helping improve deText's scam detection."
                     return@launch
                 }
                 status.text = "Screening recent SMS with local keyword rules…"
@@ -343,7 +343,7 @@ class CommunityFragment : Fragment() {
                 retryButton.visibility = if (repository.hasPending()) View.VISIBLE else View.GONE
                 discardButton.visibility = retryButton.visibility
                 showShareFeedback(if (repository.hasPending()) "Some approved messages remain pending. Retry later."
-                else "Contribution received. Thank you for helping improve ApCiDa."
+                else "Contribution received. Thank you for helping improve deText."
                 )
             } catch (error: Exception) {
                 showShareFeedback((error.message ?: "Submission unavailable") + " Approved messages remain pending for retry.")
@@ -368,7 +368,7 @@ class CommunityFragment : Fragment() {
         totalBar.progress = progress.totalAccepted
         if (progress.totalAccepted >= 40) {
             startButton.visibility = View.GONE
-            status.text = "Contribution Complete. Thank you for helping improve ApCiDa's scam detection."
+            status.text = "Contribution Complete. Thank you for helping improve deText's scam detection."
         }
     }
 

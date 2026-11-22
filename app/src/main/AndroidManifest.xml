@@ -35,17 +35,24 @@
             </intent-filter>
         </receiver>
 
-        <!-- ── Main Activity ──────────────────────────────── -->
+        <!-- The launcher plays the brand animation only when a new task opens. -->
         <activity
-            android:name=".view.activity.MainActivity"
+            android:name=".view.activity.LaunchActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.ApCiDa">
+            android:theme="@style/Theme.ApCiDa.Launch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Notification deep links continue to enter the app directly. -->
+        <activity
+            android:name=".view.activity.MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.ApCiDa" />
 
     </application>
 

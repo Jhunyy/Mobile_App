@@ -98,7 +98,7 @@ class SettingsFragment : Fragment() {
             setColorFilter(ContextCompat.getColor(context, R.color.inbox_muted))
             setPadding(dp(10), dp(10), dp(10), dp(10))
             contentDescription = "Open Android app settings"
-            setOnClickListener { openAppSettings("Manage ApCiDa permissions in Android App settings.") }
+            setOnClickListener { openAppSettings("Manage deText permissions in Android App settings.") }
         }, LinearLayout.LayoutParams(dp(42), dp(42)))
         body.addView(heading)
         body.addView(label("Manage your protection and preferences", 15f, false, R.color.inbox_muted).apply {
@@ -136,7 +136,7 @@ class SettingsFragment : Fragment() {
             } else {
                 AlertDialog.Builder(requireContext())
                     .setTitle("Enable AI Protection?")
-                    .setMessage("ApCiDa will automatically send each newly received SMS text, sender, receipt time and request ID to its remote Gemma 3 12B + RAG service. Local keyword warnings continue if the service is unavailable. You can revoke this in Settings; requests already sent cannot be recalled. Research contribution is separate.")
+                    .setMessage("deText will automatically send each newly received SMS text, sender, receipt time and request ID to its remote Gemma 3 12B + RAG service. Local keyword warnings continue if the service is unavailable. You can revoke this in Settings; requests already sent cannot be recalled. Research contribution is separate.")
                     .setNegativeButton("Cancel") { _, _ -> refreshSwitches() }
                     .setPositiveButton("I agree") { _, _ -> store.grant(); refreshSwitches() }
                     .show()
@@ -177,17 +177,17 @@ class SettingsFragment : Fragment() {
 
         section(body, "Permissions", 26)
         val permissions = card(body)
-        smsSwitch = switchRow(permissions, R.drawable.ic_messages, "SMS Access", "Allow ApCiDa to view SMS messages") {
+        smsSwitch = switchRow(permissions, R.drawable.ic_messages, "SMS Access", "Allow deText to view SMS messages") {
             if (it) requestSms.launch(arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS))
             else openAppSettings("Android manages SMS access. Turn off the SMS permissions in App settings.")
         }
         divider(permissions)
-        notificationSwitch = switchRow(permissions, R.drawable.ic_notifications, "Notifications", "Allow ApCiDa to send you notifications") { enabled ->
+        notificationSwitch = switchRow(permissions, R.drawable.ic_notifications, "Notifications", "Allow deText to send you notifications") { enabled ->
             preferences().edit().putBoolean(Constants.PREF_ALERTS_ENABLED, enabled).apply()
             if (enabled && Build.VERSION.SDK_INT >= 33 && !PermissionHelper.hasNotificationPermission(requireContext())) {
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             } else if (enabled && !NotificationManagerCompat.from(requireContext()).areNotificationsEnabled()) {
-                openAppSettings("Notifications are blocked by Android. Allow ApCiDa notifications in App settings.")
+                openAppSettings("Notifications are blocked by Android. Allow deText notifications in App settings.")
             } else refreshSwitches()
         }
         divider(permissions)
@@ -200,7 +200,7 @@ class SettingsFragment : Fragment() {
             }
         }
         divider(permissions)
-        contactsSwitch = switchRow(permissions, R.drawable.ic_groups, "Contacts Access", "Allow ApCiDa to access your contacts") { enabled ->
+        contactsSwitch = switchRow(permissions, R.drawable.ic_groups, "Contacts Access", "Allow deText to access your contacts") { enabled ->
             if (enabled) requestContacts.launch(Manifest.permission.READ_CONTACTS)
             else openAppSettings("Android manages contacts access. Turn it off in App settings.")
         }
@@ -377,7 +377,7 @@ class SettingsFragment : Fragment() {
         }
         AlertDialog.Builder(context)
             .setTitle("Remove service access?")
-            .setMessage("ApCiDa will stop future remote analysis for this phone and request deletion of its server installation and cached responses. Keep this phone online until Settings confirms deletion.")
+            .setMessage("deText will stop future remote analysis for this phone and request deletion of its server installation and cached responses. Keep this phone online until Settings confirms deletion.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Remove access") { _, _ ->
                 AiProtectionConsentStore(context).revoke()

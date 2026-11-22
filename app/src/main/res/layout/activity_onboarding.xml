@@ -57,7 +57,7 @@
             android:layout_marginTop="20dp"
             android:fontFamily="@font/dm_sans_regular"
             android:lineSpacingExtra="4dp"
-            android:text="ApCiDa uses local keyword checks immediately. Remote AI is not available in this build, so no new SMS is sent to the server automatically. A future version will ask for separate consent before sending SMS text, sender, receipt time, and request ID. Research contribution is a separate choice."
+            android:text="deText uses local keyword checks immediately. Remote AI is not available in this build, so no new SMS is sent to the server automatically. A future version will ask for separate consent before sending SMS text, sender, receipt time, and request ID. Research contribution is a separate choice."
             android:textColor="@color/text_secondary"
             android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"

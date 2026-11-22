@@ -91,7 +91,7 @@ object NotificationHelper {
             SCAM_ALERT_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "ApCiDa local keyword and remote AI scam warnings."
+            description = "deText local keyword and remote AI scam warnings."
         }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)

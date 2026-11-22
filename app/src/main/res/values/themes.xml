@@ -10,6 +10,12 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
+    <style name="Theme.ApCiDa.Launch" parent="Theme.ApCiDa">
+        <item name="android:windowBackground">@drawable/detext_launch_background</item>
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
+    </style>
+
     <style name="InboxFilterChip">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">38dp</item>

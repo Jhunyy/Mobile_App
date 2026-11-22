@@ -61,7 +61,7 @@ object DetectionPresentation {
         }
         val explanation = when {
             checkingRules -> "Checking local keyword indicators. No AI verdict is available yet."
-            pending -> "Local keyword result is preliminary. Remote AI analysis is pending and may take a couple of minutes. You can keep using ApCiDa."
+            pending -> "Local keyword result is preliminary. Remote AI analysis is pending and may take a couple of minutes. You can keep using deText."
             message.detectionState == "REMOTE_UNAVAILABLE" -> "Remote AI analysis did not complete. The local keyword result remains; this message has not been AI verified."
             legacy -> "This older result was not verified by the current remote AI service. Review the message independently."
             message.detectionState == "REMOTE_CONSENT_DISABLED" -> "Remote analysis was not enabled for this message. Only local keyword screening was completed."

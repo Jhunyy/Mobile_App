@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ApCiDa</string>
+    <string name="app_name">deText</string>
     <string name="unknown_sender">Unknown Sender</string>
     <string name="show_contact_names">Show contact names</string>
     <string name="hide_contact_names">Hide contact names</string>

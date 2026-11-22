@@ -279,7 +279,7 @@ class MessagesFragment : Fragment() {
             }.joinToString("\n\n")
             AlertDialog.Builder(requireContext())
                 .setTitle("Analyze these ${messages.size} older messages?")
-                .setMessage("ApCiDa will send the full SMS text, sender and date of each message " +
+                .setMessage("deText will send the full SMS text, sender and date of each message " +
                     "shown below to your private AI server. Only this batch is authorized. " +
                     "It will process one at a time, up to three. You can stop it from this menu.\n\n$previews")
                 .setNegativeButton(android.R.string.cancel, null)
