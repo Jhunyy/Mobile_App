@@ -21,11 +21,11 @@ Phone review: open **ApCiDa Beta**, complete local onboarding, and check that Se
 Only for a supervised phone that already redeemed its own invite, build the same beta package with `-Papcida.realSmsPilot=true`:
 
 ```powershell
-.\gradlew.bat :app:assembleBeta -Papcida.realSmsPilot=true --console=plain
+.\gradlew.bat :app:assembleBeta "--project-prop=apcida.realSmsPilot=true" --console=plain
 adb install -r ".\app\build\outputs\apk\beta\app-beta.apk"
 ```
 
-On macOS, use `./gradlew :app:assembleBeta -Papcida.realSmsPilot=true --console=plain`, then install `app/build/outputs/apk/beta/app-beta.apk`. Confirm that the app shown in Android's App info is **ApCiDa Beta** (`com.apcida.smishingdetector.beta`). A debug APK or an ordinary beta APK can look similar but has automatic Remote AI disabled. If Settings says “Remote AI is not available in this build,” the installed APK was built without the explicit pilot flag. If invite setup says “The approved service address is not configured,” it was also built without `apcida.productionApprovedHost=sms.apcida.stream` in the builder's ignored `local.properties`. Rebuild and update the same beta package with both settings; toggling Settings cannot add a missing build-time value.
+On macOS, use `./gradlew :app:assembleBeta '--project-prop=apcida.realSmsPilot=true' --console=plain`, then install `app/build/outputs/apk/beta/app-beta.apk`. Quote the complete property option in PowerShell: if Gradle reports that `.realSmsPilot=true` is an unknown task, the property was split before Gradle received it. Confirm that the app shown in Android's App info is **ApCiDa Beta** (`com.apcida.smishingdetector.beta`). A debug APK or an ordinary beta APK can look similar but has automatic Remote AI disabled. If Settings says “Remote AI is not available in this build,” the installed APK was built without the explicit pilot flag. If invite setup says “The approved service address is not configured,” it was also built without `apcida.productionApprovedHost=sms.apcida.stream` in the builder's ignored `local.properties`. Rebuild and update the same beta package with both settings; toggling Settings cannot add a missing build-time value.
 
 If Settings says “Installation credential: held for deletion” or “Remote deletion pending,” the previous service access must be revoked before a new invite can be used. After updating to a beta APK with the approved host, use the pending-deletion status in Settings to retry while online. Wait for confirmed deletion before attempting a new enrollment. Do not clear app data or uninstall merely to hide a pending deletion; that can discard the credential needed to complete server revocation.
 
