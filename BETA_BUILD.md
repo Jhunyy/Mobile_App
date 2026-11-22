@@ -18,7 +18,17 @@ Phone review: open **ApCiDa Beta**, complete local onboarding, and check that Se
 
 ## Explicit one-phone real SMS pilot build
 
-Only for a supervised phone that already redeemed its own invite, build the same beta package with `-Papcida.realSmsPilot=true`:
+Only for a supervised phone that already redeemed its own invite, open `local.properties` in the Android project root (for example, `D:\Mobile Natin\local.properties`) and add the approved host on its own line. Keep any existing `sdk.dir` line. This file is ignored by Git, so each builder must set it on their own computer:
+
+```powershell
+notepad .\local.properties
+```
+
+```properties
+apcida.productionApprovedHost=sms.apcida.stream
+```
+
+Save and close Notepad, then build the beta package with the pilot property:
 
 ```powershell
 .\gradlew.bat :app:assembleBeta "--project-prop=apcida.realSmsPilot=true" --console=plain
@@ -29,6 +39,6 @@ On macOS, use `./gradlew :app:assembleBeta '--project-prop=apcida.realSmsPilot=t
 
 If Settings says “Installation credential: held for deletion” or “Remote deletion pending,” the previous service access must be revoked before a new invite can be used. After updating to a beta APK with the approved host, use the pending-deletion status in Settings to retry while online. Wait for confirmed deletion before attempting a new enrollment. Do not clear app data or uninstall merely to hide a pending deletion; that can discard the credential needed to complete server revocation.
 
-The build fails unless `apcida.productionApprovedHost=sms.apcida.stream` is in the ignored `local.properties`. The flag affects only the beta build; debug and release remain closed. The beta uses the builder's debug signing key, so update the phone from the same computer that installed its existing beta. Installing this build does not start remote analysis. The tester must separately turn on **AI Protection** in Settings and accept the disclosure; only new SMS received after consent is eligible. Turning it off stops new remote sends and requests deletion of that installation's remote analysis cache. Local keyword warnings continue during an outage, and an unavailable remote result must not be presented as verified safe.
+If Gradle says “The supervised SMS pilot requires sms.apcida.stream as its approved host,” check the project-root `local.properties` for that exact line, then rerun the build. The flag affects only the beta build; debug and release remain closed. The beta uses the builder's debug signing key, so update the phone from the same computer that installed its existing beta. Installing this build does not start remote analysis. The tester must separately turn on **AI Protection** in Settings and accept the disclosure; only new SMS received after consent is eligible. Turning it off stops new remote sends and requests deletion of that installation's remote analysis cache. Local keyword warnings continue during an outage, and an unavailable remote result must not be presented as verified safe.
 
 This pilot build sends real SMS text, sender, receipt time, and request ID to the owner's server after consent. Use only one consenting tester; do not distribute the APK as a public release. No off-device recovery copy or stable production signing key has been set up, so this is a temporary supervised pilot, not a production deployment.
