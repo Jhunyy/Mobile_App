@@ -37,8 +37,7 @@ class CommunityRepository(private val context: Context) {
             .create(CommunityApi::class.java)
     }
 
-    fun cachedProgress() = ContributionProgress(prefs.getInt("scam", 0), prefs.getInt("safe", 0),
-        prefs.getInt("total", 0))
+    fun cachedProgress() = ContributionProgress(prefs.getInt("total", 0))
     fun acceptedIds(): Set<String> = prefs.getStringSet("accepted_ids", emptySet())?.toSet() ?: emptySet()
     fun hasPending(): Boolean = pendingFile.exists()
     fun discardPending() { pendingFile.delete() }
@@ -70,7 +69,15 @@ class CommunityRepository(private val context: Context) {
     suspend fun submitPending(): ContributionProgress = withContext(Dispatchers.IO) {
         if (!configured()) throw IllegalStateException("Phone access or research service is unavailable.")
         if (!pendingFile.exists()) return@withContext refresh()
-        val batch = gson.fromJson(pendingFile.readText(), ContributionBatch::class.java)
+        val stored = pendingFile.readText()
+        var batch = gson.fromJson(stored, ContributionBatch::class.java)
+        if (CommunitySubmissionPolicy.hasLegacyParticipantLabels(stored)) {
+            // An older approved batch used participant labels. Give its unlabeled
+            // retry a new idempotency key while keeping the reviewed text and IDs.
+            batch = batch.copy(batchId = UUID.randomUUID().toString(),
+                submittedAt = System.currentTimeMillis())
+            pendingFile.writeText(gson.toJson(batch))
+        }
         val auth = authorization()
         val response = api.submit(auth.first, auth.second, auth.third, batch)
         if (!response.isSuccessful) throw IllegalStateException("Contribution upload failed (${response.code()}).")
@@ -94,10 +101,8 @@ class CommunityRepository(private val context: Context) {
     }
 
     private fun cache(progress: ContributionProgress) {
-        require(progress.scamAccepted in 0..40 && progress.safeAccepted in 0..40 &&
-            progress.totalAccepted == progress.scamAccepted + progress.safeAccepted &&
-            progress.totalAccepted in 0..40)
-        prefs.edit().putInt("scam", progress.scamAccepted).putInt("safe", progress.safeAccepted)
+        require(progress.totalAccepted in 0..40)
+        prefs.edit().remove("scam").remove("safe")
             .putInt("total", progress.totalAccepted).apply()
     }
 }

@@ -33,12 +33,11 @@ interface CommunityApi {
     ): Response<Void>
 }
 
-data class ContributionProgress(val scamAccepted: Int, val safeAccepted: Int, val totalAccepted: Int)
+data class ContributionProgress(val totalAccepted: Int)
 data class ContributionItem(
     val clientId: String,
     val text: String,
     val localSuggestion: String,
-    val reviewedCategory: String,
     val reviewedAt: Long
 )
 data class ContributionBatch(

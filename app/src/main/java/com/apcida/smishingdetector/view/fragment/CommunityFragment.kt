@@ -8,14 +8,12 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -39,13 +37,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 class CommunityFragment : Fragment() {
     private data class ReviewRow(val candidate: ContributionCandidate, val include: CheckBox,
-                                 val text: EditText, val category: Spinner)
+                                 val text: EditText)
     private val rows = mutableListOf<ReviewRow>()
     private lateinit var repository: CommunityRepository
     private lateinit var body: LinearLayout
     private lateinit var progressText: TextView
-    private lateinit var scamBar: ProgressBar
-    private lateinit var safeBar: ProgressBar
     private lateinit var totalBar: ProgressBar
     private lateinit var status: TextView
     private lateinit var candidateContainer: LinearLayout
@@ -55,7 +51,7 @@ class CommunityFragment : Fragment() {
     private lateinit var retryButton: Button
     private lateinit var discardButton: Button
     private lateinit var busy: ProgressBar
-    private var progress = ContributionProgress(0, 0, 0)
+    private var progress = ContributionProgress(0)
     private var scanning = false
     private var lastScanExamined = 0
     private var lastScanOffered = 0
@@ -81,9 +77,9 @@ class CommunityFragment : Fragment() {
         val intro = panel()
         intro.addView(label("Your choice", 18f, true, R.color.inbox_text))
         intro.addView(label(
-            "You may contribute up to 40 SMS messages over several sessions. ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation. Local keyword rules are recorded for research; they do not decide which eligible messages are offered or verify a label. Nothing is shared during the scan. Review, edit, select, and label each message before upload. Participation is optional.",
+            "You may contribute up to 40 SMS messages over several sessions. ApCiDa will examine accessible SMS received in the last 30 days, including messages received before installation. Local keyword rules are recorded for research; they do not decide which eligible messages are offered or verify a label. Nothing is shared during the scan. Review, edit, and select each message before upload. Participation is optional.",
             14f, false, R.color.inbox_muted), margin(0, 8))
-        intro.addView(label("A contribution shares your edited SMS text, a local rule suggestion, your chosen category, a pseudonymous participant ID, and review/submission times. Sender numbers and contact names are not sent. A network expert will independently label the messages; research analysis happens later.",
+        intro.addView(label("A contribution shares your edited SMS text, a local rule suggestion, a pseudonymous participant ID, and review/submission times. Sender numbers and contact names are not sent. A network expert will independently label the messages; research analysis happens later.",
             13f, false, R.color.inbox_muted), margin(0, 10))
         intro.addView(label("Study records are kept in the active research database for up to 365 days after your latest upload. You can withdraw your contributions in this screen.",
             13f, false, R.color.inbox_muted), margin(0, 10))
@@ -92,8 +88,6 @@ class CommunityFragment : Fragment() {
         progressText = label("", 15f, false, R.color.inbox_text)
         val progressPanel = panel()
         progressPanel.addView(progressText)
-        scamBar = progressBar(progressPanel, 40)
-        safeBar = progressBar(progressPanel, 40)
         totalBar = progressBar(progressPanel, 40)
 
         startButton = button("Start Contributing") { askScanConsent() }
@@ -121,7 +115,7 @@ class CommunityFragment : Fragment() {
                     lifecycleScope.launch {
                         try {
                             repository.withdraw()
-                            progress = ContributionProgress(0, 0, 0)
+                            progress = ContributionProgress(0)
                             showProgress()
                             retryButton.visibility = View.GONE
                             discardButton.visibility = View.GONE
@@ -213,7 +207,7 @@ class CommunityFragment : Fragment() {
                         status.text = if (scanProgress.analyzing) {
                             "Screening recent SMS ${scanProgress.analyzed + 1} on this device… Checked ${scanProgress.examined}; found ${scanProgress.candidates}."
                         } else {
-                            "Checked ${scanProgress.examined} SMS from the last 30 days; analyzed ${scanProgress.analyzed}; found ${scanProgress.candidates} for review…"
+                            "Checked ${scanProgress.examined} SMS from the last 30 days; screened ${scanProgress.analyzed} locally; found ${scanProgress.candidates} for review…"
                         }
                     }
                 }
@@ -234,14 +228,14 @@ class CommunityFragment : Fragment() {
     }
 
     private fun scanResultMessage(result: CommunityScanResult): String {
-        val summary = "Checked ${result.progress.examined} SMS from the last 30 days and analyzed ${result.progress.analyzed}. "
+        val summary = "Checked ${result.progress.examined} SMS from the last 30 days and screened ${result.progress.analyzed} locally. "
         val outcome = if (result.candidates.isEmpty()) "No messages qualified in this scan." else
             "Found ${result.candidates.size} for review. Edit or remove any message before sharing."
         val limit = when (result.stopReason) {
             CommunityScanResult.StopReason.FINISHED -> ""
             CommunityScanResult.StopReason.TIME_LIMIT -> " Scan stopped after three minutes."
             CommunityScanResult.StopReason.MESSAGE_LIMIT -> " Scan stopped after checking 1,000 messages."
-            CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after analyzing 20 messages."
+            CommunityScanResult.StopReason.ANALYSIS_LIMIT -> " Scan stopped after offering 20 messages."
             CommunityScanResult.StopReason.MODEL_FAILURE ->
                 " Screening stopped after repeated failures."
         }
@@ -261,22 +255,6 @@ class CommunityFragment : Fragment() {
                 setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
             }
             panel.addView(include)
-            val categories = Spinner(requireContext())
-            categories.adapter = object : ArrayAdapter<String>(requireContext(),
-                android.R.layout.simple_spinner_item, listOf("Choose a label", "SCAM", "SAFE")) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                    super.getView(position, convertView, parent).apply {
-                        (this as TextView).setTextColor(ContextCompat.getColor(context, R.color.inbox_text))
-                    }
-
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
-                    super.getDropDownView(position, convertView, parent).apply {
-                        (this as TextView).setTextColor(ContextCompat.getColor(context, R.color.inbox_text))
-                        setBackgroundColor(Color.WHITE)
-                    }
-            }.apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-            categories.setSelection(0)
-            panel.addView(categories)
             val text = EditText(requireContext()).apply {
                 setText(candidate.text)
                 minLines = 3
@@ -287,7 +265,7 @@ class CommunityFragment : Fragment() {
                 setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_muted))
             }
             panel.addView(text)
-            rows += ReviewRow(candidate, include, text, categories)
+            rows += ReviewRow(candidate, include, text)
         }
         submitButton.visibility = View.VISIBLE
         if (!repository.configured()) {
@@ -313,12 +291,6 @@ class CommunityFragment : Fragment() {
         }
         val selected = rows.filter { it.include.isChecked }
         if (selected.isEmpty()) { showShareFeedback("Select at least one message to share."); return }
-        if (selected.any { it.category.selectedItem.toString() !in setOf("SCAM", "SAFE") }) {
-            showShareFeedback("Choose Scam or Safe for every selected message.")
-            return
-        }
-        val scamCount = selected.count { it.category.selectedItem.toString() == "SCAM" }
-        val safeCount = selected.size - scamCount
         if (selected.size > CommunityPolicy.remaining(progress.totalAccepted)) {
             showShareFeedback("Selection exceeds your remaining 40-message limit. Remove messages.")
             return
@@ -326,7 +298,7 @@ class CommunityFragment : Fragment() {
         val edited = selected.map { row ->
             val text = CommunityPolicy.redact(row.text.text.toString())
             ContributionItem(row.candidate.id, text, row.candidate.localSuggestion,
-                row.category.selectedItem.toString(), System.currentTimeMillis())
+                System.currentTimeMillis())
         }
         if (edited.any { !CommunityPolicy.eligible(it.text) }) {
             showShareFeedback("A selected message is empty, too long, or contains a code or sensitive term. Edit or remove it.")
@@ -339,7 +311,7 @@ class CommunityFragment : Fragment() {
         shareStatus.visibility = View.GONE
         AlertDialog.Builder(requireContext())
             .setTitle("Share reviewed messages?")
-            .setMessage("Send $scamCount Scam and $safeCount Safe edited SMS messages to the research server for thesis evaluation only? It will also receive local suggestions, your labels, a pseudonymous ID, and timestamps. A network expert will label them independently. Active study records are kept for up to 365 days after your latest upload; you can withdraw them. This is a separate upload confirmation.")
+            .setMessage("Send ${selected.size} edited SMS messages to the research server for thesis evaluation only? It will also receive local suggestions, a pseudonymous ID, and timestamps. A network expert will label them independently. Active study records are kept for up to 365 days after your latest upload; you can withdraw them. This is a separate upload confirmation.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Confirm and Share") { _, _ ->
                 lifecycleScope.launch {
@@ -392,9 +364,7 @@ class CommunityFragment : Fragment() {
     }
 
     private fun showProgress() {
-        progressText.text = "Your Scam labels: ${progress.scamAccepted}\nYour Safe labels: ${progress.safeAccepted}\nTotal Contributed: ${progress.totalAccepted}/40"
-        scamBar.progress = progress.scamAccepted
-        safeBar.progress = progress.safeAccepted
+        progressText.text = "Total Contributed: ${progress.totalAccepted}/40"
         totalBar.progress = progress.totalAccepted
         if (progress.totalAccepted >= 40) {
             startButton.visibility = View.GONE

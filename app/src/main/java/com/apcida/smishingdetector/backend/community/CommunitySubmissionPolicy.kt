@@ -1,7 +1,13 @@
 package com.apcida.smishingdetector.backend.community
 
+import com.google.gson.JsonParser
+
 /** Removes only server-acknowledged decisions, so transient failures leave the batch retryable. */
 object CommunitySubmissionPolicy {
+    fun hasLegacyParticipantLabels(serializedBatch: String): Boolean =
+        JsonParser().parse(serializedBatch).asJsonObject.getAsJsonArray("items")
+            ?.any { it.asJsonObject.has("reviewedCategory") } == true
+
     fun remaining(batch: ContributionBatch, response: ContributionResponse): List<ContributionItem> {
         val submitted = batch.items.map { it.clientId }.toSet()
         val accepted = response.acceptedClientIds.toSet()
